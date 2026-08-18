@@ -1,0 +1,191 @@
+from typing import List, Optional, Any
+from pydantic import BaseModel, Field
+
+class TemplateField(BaseModel):
+    field_id: str
+    field_label: str
+    data_type: str
+    required: bool
+    extraction_hint: Optional[str] = None
+    default_value: Optional[str] = None
+    validation_rules: Optional[List[Any]] = Field(default_factory=list)
+    page_number: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+class TemplateSection(BaseModel):
+    section_id: str
+    section_name: str
+    page_number: Optional[int] = None
+    fields: List[TemplateField] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+class DocumentSection(BaseModel):
+    """A section of the document with full HTML content and metadata."""
+    section_id: str
+    section_name: str
+    section_number: int = 0
+    content_html: str
+    paragraphs: List[Any] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+class TemplateListResponse(BaseModel):
+    template_id: str
+    template_name: str
+    version: str
+    specification_number: Optional[str] = None
+    description: Optional[str] = None
+    structure_locked: bool = False
+    sections: List[TemplateSection] = Field(default_factory=list)
+    page_count: int = 1
+    preview_html: Optional[str] = None
+    document_sections: List[DocumentSection] = Field(default_factory=list)
+    page_images: List[str] = Field(default_factory=list)
+    # Per-page HTML fallback rendered directly from the .docx (no
+    # LibreOffice/soffice dependency). Used by the page review UI when
+    # page_images[i] is missing or soffice conversion failed.
+    page_html: List[str] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+class TemplatePreviewResponse(TemplateListResponse):
+    class Config:
+        from_attributes = True
+
+class TemplateDetailResponse(TemplatePreviewResponse):
+    class Config:
+        from_attributes = True
+
+class PendingTemplateResponse(TemplateListResponse):
+    id: int
+    status: str
+    source_filename: Optional[str] = None
+    text_preview: Optional[str] = None
+    structure_locked: bool = False
+    document_sections: List[DocumentSection] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+class PendingTemplateUpdateRequest(BaseModel):
+    template_name: Optional[str] = None
+    description: Optional[str] = None
+    specification_number: Optional[str] = None
+    sections: Optional[List[TemplateSection]] = None
+
+class CreateProjectRequest(BaseModel):
+    project_name: str
+    template_id: str
+
+class ProjectResponse(BaseModel):
+    id: int
+    project_name: str
+    template_id: str
+    template_name: str
+    template_version: str
+    status: str
+    created_at: str
+    updated_at: str
+    document_count: int = 0
+    latest_job_status: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class ProjectDetailResponse(ProjectResponse):
+    documents: List[Any] = Field(default_factory=list)
+    extraction_jobs: List[Any] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+class DocumentMetadataResponse(BaseModel):
+    id: int
+    project_id: int
+    original_filename: str
+    stored_filename: str
+    file_type: str
+    file_size: int
+    page_count: int
+    upload_status: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+class CreateExtractionRequest(BaseModel):
+    document_id: int
+
+class SourceReferenceResponse(BaseModel):
+    page_number: Optional[int] = None
+    source_text: Optional[str] = None
+    confidence: Optional[float] = None
+    bounding_box: Optional[Any] = None
+
+    class Config:
+        from_attributes = True
+
+class ExtractedFieldResponse(BaseModel):
+    field_id: str
+    field_label: str
+    value: Optional[str] = None
+    confidence: Optional[float] = None
+    validation_status: str
+    source_references: List[SourceReferenceResponse] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+class ExtractionJobResponse(BaseModel):
+    id: int
+    project_id: int
+    document_id: int
+    template_id: int
+    status: str
+    progress: int
+    current_page: int
+    total_pages: int
+    error_message: Optional[str] = None
+    created_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    extracted_fields: List[ExtractedFieldResponse] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+class ModelHealthResponse(BaseModel):
+    available: bool
+    model: str
+    provider: str
+    device: Optional[str] = None
+    reason: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class DashboardStatsResponse(BaseModel):
+    total_projects: int
+    projects_created_this_month: int
+    documents_processed: int
+    documents_processed_this_week: int
+    extraction_accuracy: Optional[float] = None
+    pending_validation: int
+    active_templates: int
+
+class FieldUpdateRequest(BaseModel):
+    value: Optional[str] = None
+    validation_status: str
+
+class PageResponse(BaseModel):
+    document_id: int
+    page_number: int
+    text: Optional[str] = None
+    has_image: bool = False
+    total_pages: int = 0

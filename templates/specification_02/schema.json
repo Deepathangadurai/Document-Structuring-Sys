@@ -1,0 +1,33 @@
+{
+  "template_id": "specification_02",
+  "template_name": "Specification 02",
+  "version": "1.0",
+  "specification_number": "IP009-43-03-01-P.DOC",
+  "description": "Master template definition for Specification 02.",
+  "file_name": "IP009-43-03-01-P.DOC",
+  "structure_locked": true,
+  "sections": [
+    {
+      "section_id": "general",
+      "section_name": "General",
+      "fields": [
+        {
+          "field_id": "project_name",
+          "field_label": "Project Name",
+          "data_type": "string",
+          "required": true,
+          "extraction_hint": "Extract the project name from the source document.",
+          "validation_rules": []
+        },
+        {
+          "field_id": "revision",
+          "field_label": "Revision",
+          "data_type": "string",
+          "required": false,
+          "extraction_hint": "Extract the revision identifier.",
+          "validation_rules": []
+        }
+      ]
+    }
+  ]
+}

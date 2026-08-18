@@ -1,0 +1,16 @@
+fastapi==0.108.0
+uvicorn[standard]==0.23.2
+SQLAlchemy==2.0.45
+psycopg2-binary==2.9.10
+pydantic==2.7.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.0
+httpx==0.24.1
+qdrant-client==1.7.3
+python-multipart==0.0.6
+python-docx==0.8.11
+olefile==0.47
+Pillow==10.0.1
+PyMuPDF==1.23.5
+pytesseract==0.3.10
+pywin32==306; platform_system == "Windows"
