@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # of the process's life. Trip it open for a cooldown window, then let one
 # request through to test recovery - the same pattern used for a flaky
 # downstream dependency anywhere else.
-_BREAKER_COOLDOWN_SECONDS = 300  # 5 minutes
+_BREAKER_COOLDOWN_SECONDS = 15
 _breaker_open_until: float = 0.0
 
 
@@ -67,7 +67,7 @@ def is_configured() -> bool:
 def is_available() -> bool:
     """Cheap reachability check, used for health reporting - does not
     consume/trip the circuit breaker itself."""
-    if not is_configured():
+    if not settings.GOTENBERG_URL:
         return False
     try:
         base = settings.GOTENBERG_URL.rstrip("/")
@@ -86,7 +86,7 @@ def convert_docx_to_pdf(docx_path: Path, output_dir: Path) -> Path:
     back to the direct soffice/Word path, exactly as they already do for
     those.
     """
-    if not is_configured():
+    if not settings.GOTENBERG_URL:
         raise RuntimeError("GOTENBERG_URL is not configured")
     if _breaker_is_open():
         raise RuntimeError("Gotenberg circuit breaker is open (recent failure) - skipping")

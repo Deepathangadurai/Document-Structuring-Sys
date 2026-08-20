@@ -16,11 +16,11 @@ function NavItem({
   return (
     <Link
       to={to}
-      className={`w-full flex items-center px-4 py-2.5 mb-1 rounded-md text-sm font-medium transition-colors ${
-        active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+      className={`w-full flex items-center gap-2.5 px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+        active ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
       }`}
     >
-      <Icon className={`w-5 h-5 mr-3 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
+      <Icon className="w-5 h-5" />
       {label}
     </Link>
   )
@@ -41,18 +41,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      <div className="w-64 bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm">
-        <div className="h-16 flex items-center px-6 border-b border-slate-200">
-          <div className="w-6 h-6 bg-blue-600 rounded mr-3 flex items-center justify-center text-white font-bold text-xs">
+      <div className="w-56 flex flex-col z-20 shadow-sm" style={{ background: '#1A3A6B' }}>
+        <div className="h-16 flex items-center px-5 border-b border-white/10">
+          <div className="w-7 h-7 rounded mr-2.5 flex items-center justify-center text-white font-bold text-xs" style={{ background: '#F97316' }}>
             DS
           </div>
-          <span className="font-bold text-slate-900 tracking-tight truncate">DocStructure Sys</span>
+          <span className="font-bold text-white tracking-tight truncate text-sm">DocStructure Sys</span>
         </div>
 
         <div className="flex-1 overflow-y-auto py-4 px-3 scrollbar-hide">
           <NavItem to="/" label="Dashboard" icon={Icons.LayoutDashboard} active={location.pathname === '/'} />
 
-          <div className="mt-6 mb-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Management</div>
+          <div className="mt-6 mb-2 px-3 text-xs font-semibold text-white/40 uppercase tracking-wider">Management</div>
           <NavItem to="/projects" label="Projects" icon={Icons.Folder} active={location.pathname === '/projects'} />
           <NavItem
             to="/projects/new"
@@ -63,14 +63,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <NavItem to="/templates" label="Templates" icon={Icons.LayoutDashboard} active={location.pathname === '/templates'} />
         </div>
 
-        <div className="p-4 border-t border-slate-200 bg-slate-50">
+        <div className="p-4 border-t border-white/10">
           <div className="flex items-center">
-            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold" style={{ background: '#F97316' }}>
               D
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-slate-900">Deepa</p>
-              <p className="text-xs text-slate-500">Document Engineer</p>
+              <p className="text-sm font-medium text-white">Deepa</p>
+              <p className="text-xs text-white/50">Document Engineer</p>
             </div>
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <input
                 type="text"
                 placeholder="Search..."
-                className="pl-9 pr-4 py-1.5 bg-slate-100 border-transparent rounded-md text-sm focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all w-64"
+                className="pl-9 pr-4 py-1.5 bg-slate-100 border-transparent rounded-md text-sm focus:bg-white focus:border-brand focus:ring-1 focus:ring-brand/20 transition-all w-64"
               />
             </div>
             <button className="hover:text-slate-900 relative">

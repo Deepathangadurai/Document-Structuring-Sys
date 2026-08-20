@@ -1,10 +1,11 @@
 import os
+import sys
 import shutil
 import subprocess
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
-from typing import List, cast
+from typing import List, cast, Optional, Any
 from sqlalchemy.orm import Session
 from docx import Document as DocxDocument
 from PIL import Image
@@ -12,8 +13,6 @@ import fitz
 import pytesseract
 from app.core.config import settings
 from app.db.models import Document, DocumentPage, Project
-from typing import Optional
-from typing import Any, List, cast
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg", ".tiff", ".bmp"}
 
@@ -99,10 +98,6 @@ class DocumentService:
         stored_filename = cast(str, document.stored_filename)
         file_type = cast(str, document.file_type)
 
-        # Reuse self.originals_path (built from STORAGE_ORIGINALS_PATH) rather
-        # than re-deriving from STORAGE_PATH directly - the two can diverge
-        # depending on env overrides, which previously caused "file not
-        # found" failures even when the upload succeeded.
         document_path = self.originals_path / stored_filename
         if not document_path.exists():
             setattr(document, "upload_status", "failed")
@@ -140,7 +135,7 @@ class DocumentService:
         pages = []
         doc_id = cast(int, document.id)
         try:
-            pdf_doc = cast(Any, fitz.open(str(path)))
+            pdf_doc = cast(Any, getattr(fitz, "open")(str(path)))
             for number, page in enumerate(pdf_doc, start=1):
                 text = page.get_text() or ""
                 image_path = None
@@ -157,25 +152,6 @@ class DocumentService:
         return pages
 
     def _extract_docx_pages(self, document: Document, path: Path):
-        # This used to only join doc.paragraphs, which (a) always returned
-        # exactly one "page" no matter how long the document actually was,
-        # and (b) silently dropped every table's contents entirely, since
-        # doc.paragraphs never includes table cell text. For a spec-style
-        # document that's almost everything - the title block, the field
-        # table, the whole extraction target.
-        #
-        # Fixed by rendering the document to real per-page images the same
-        # way the template-preview pipeline already does (docx -> pdf ->
-        # one PNG per page via LibreOffice + PyMuPDF), then, for each page,
-        # combining two text sources:
-        #   1. The PDF's real text layer (page.get_text()), which includes
-        #      table cell text in reading order alongside paragraph text -
-        #      this is real page-boundary text, not a paragraph-count guess.
-        #   2. OCR run on the rasterized page image. The text layer above
-        #      has nothing for content that was pasted into the document as
-        #      a picture (e.g. a table screenshotted from another system),
-        #      since that's just pixels to the PDF - OCR is what actually
-        #      recovers that text.
         doc_id = cast(int, document.id)
         target_path = path
         if path.suffix.lower() == ".doc":
@@ -185,26 +161,6 @@ class DocumentService:
         from docx.table import Table as _DocxTable
         import docx as _docx_module
 
-        # PyMuPDF's page.get_text() reads a page left-to-right/top-to-bottom
-        # by raw text position. For a multi-column table that's *lossy in a
-        # way that doesn't look lossy*: every cell's text is still present
-        # somewhere in the string, but which value belongs to which column
-        # is no longer recoverable - e.g. a 4-column "Area | Classification
-        # | Lux Level | Type of Lamps" table comes out as one run-on line
-        # per row with the column boundaries gone. That's fine for a human
-        # skimming the page, but it's exactly the structure the extraction
-        # model (see model/qwen_vl.py._build_prompt, which sends this text
-        # verbatim) needs to correctly associate a table value with the
-        # right field - so table-derived fields silently come back null
-        # even though their text technically made it into page.text.
-        #
-        # Walk the real docx tables directly (tab-joined cells, in column
-        # order) and place each row on the *real* PDF page it renders on -
-        # found via the same content-matching _PageLocator the schema/field
-        # extraction pipeline already uses successfully, rather than the
-        # separate paragraph-count page-boundary heuristic (which on real
-        # documents can collapse almost everything onto page 1 and leave
-        # every later page empty - useless for this purpose).
         table_rows_by_page: dict[int, list[str]] = {}
         try:
             structure_doc = _docx_module.Document(str(target_path))
@@ -214,7 +170,7 @@ class DocumentService:
         pdf_path = None
         try:
             pdf_path = _docx_to_pdf(target_path)
-            pdf_doc = cast(Any, fitz.open(str(pdf_path)))
+            pdf_doc = cast(Any, getattr(fitz, "open")(str(pdf_path)))
             page_texts = [pdf_doc[i].get_text() or "" for i in range(len(pdf_doc))]
 
             if structure_doc is not None and page_texts:
@@ -227,10 +183,6 @@ class DocumentService:
                                 cells = [c.text.strip() for c in row.cells]
                             except (IndexError, AttributeError):
                                 continue
-                            # Collapse horizontally-merged cells (python-docx
-                            # repeats the same cell object for each spanned
-                            # column) before joining, so a merged cell
-                            # doesn't show up twice in the row.
                             deduped: list[str] = []
                             for c in cells:
                                 if not deduped or deduped[-1] != c:
@@ -259,9 +211,6 @@ class DocumentService:
                 except Exception:
                     ocr_text = ""
 
-                # Only append OCR output the text layer doesn't already
-                # have, so a normal (non-image) page doesn't get every
-                # line duplicated.
                 combined_text = text_layer
                 if ocr_text.strip() and ocr_text.strip() not in text_layer:
                     combined_text = f"{text_layer}\n{ocr_text}".strip()
@@ -287,13 +236,6 @@ class DocumentService:
                 except Exception:
                     pass
 
-        # Fallback: if LibreOffice/PyMuPDF aren't available (or conversion
-        # failed), use the soffice-independent page splitter - this still
-        # gives real multi-page, table-inclusive text (paragraphs *and*
-        # table cell text, walked in true document order and split by the
-        # same page-boundary heuristic the template preview uses) instead
-        # of collapsing the whole document into a single page of
-        # paragraph-only text.
         try:
             from app.services.schema_inference import extract_docx_text_pages
 
@@ -303,9 +245,6 @@ class DocumentService:
         except Exception:
             pass
 
-        # Ultimate fallback: at least return the raw paragraph text rather
-        # than nothing. Tables and true page breaks are lost in this path -
-        # it's a last-last-resort, not the normal path.
         try:
             doc = DocxDocument(str(target_path))
             text = "\n".join(p.text for p in doc.paragraphs if p.text)
@@ -325,14 +264,18 @@ class DocumentService:
     def _convert_doc_to_docx(self, path: Path) -> Path:
         soffice_executable = None
         configured = getattr(settings, "LIBREOFFICE_PATH", None)
-        if configured:
-            configured_path = Path(configured).expanduser()
-            if configured_path.exists():
-                soffice_executable = str(configured_path)
-            else:
-                soffice_executable = shutil.which(str(configured_path)) or shutil.which("soffice.exe") or shutil.which("soffice") or shutil.which("soffice.com")
+
+        # 1. First check if configured path directly exists
+        if configured and Path(configured).expanduser().exists():
+            soffice_executable = str(Path(configured).expanduser())
         else:
-            soffice_executable = shutil.which("soffice.exe") or shutil.which("soffice") or shutil.which("soffice.com")
+            # 2. Dynamic binary resolution prioritizing Linux/standard executable names
+            soffice_executable = (
+                shutil.which("libreoffice")
+                or shutil.which("soffice")
+                or shutil.which("soffice.exe")
+                or shutil.which("soffice.com")
+            )
 
         if soffice_executable is not None:
             output_dir = self.processed_path
@@ -350,10 +293,14 @@ class DocumentService:
             converted = output_dir / (path.stem + ".docx")
             return converted
 
-        if shutil.which("winword") is not None or Path("C:/Program Files/Microsoft Office/root/Office16/WINWORD.EXE").exists():
+        # Word COM Automation (Windows-only fallback)
+        if sys.platform == "win32" and (
+            shutil.which("winword") is not None
+            or Path("C:/Program Files/Microsoft Office/root/Office16/WINWORD.EXE").exists()
+        ):
             try:
-                import pythoncom
-                import win32com.client
+                import pythoncom  # type: ignore[import-not-found, import-untyped]
+                import win32com.client  # type: ignore[import-not-found, import-untyped]
             except ImportError as exc:  # pragma: no cover - Windows-only dependency path.
                 raise FileNotFoundError(
                     "Neither LibreOffice nor Word automation is available for .doc conversion. "
@@ -403,6 +350,4 @@ class DocumentService:
         page_dir.mkdir(parents=True, exist_ok=True)
         image_path = page_dir / f"page_{page_number}.png"
         image_path.write_bytes(image_bytes)
-        # Store an absolute path so it can be read back reliably regardless
-        # of the process's current working directory (Docker vs local dev).
         return str(image_path.resolve())

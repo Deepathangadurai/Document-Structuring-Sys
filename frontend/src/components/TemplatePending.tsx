@@ -62,7 +62,7 @@ export default function TemplatePending() {
   return (
     <div className="p-8 max-w-5xl mx-auto overflow-y-auto h-full pb-20">
       <div className="mb-8">
-        <Link to="/templates" className="text-sm text-blue-600 hover:underline">
+        <Link to="/templates" className="text-sm text-brand hover:underline">
           &larr; Back to Templates
         </Link>
         <h1 className="text-2xl font-semibold text-slate-900 mt-2">Pending review</h1>
@@ -105,7 +105,7 @@ export default function TemplatePending() {
                   <div className="flex gap-2 flex-wrap justify-end">
                     <button
                       onClick={() => handlePageByPageReview(t.id)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                      className="px-4 py-2 bg-brand text-white rounded hover:bg-brand-dark transition"
                     >
                       Review Pages
                     </button>

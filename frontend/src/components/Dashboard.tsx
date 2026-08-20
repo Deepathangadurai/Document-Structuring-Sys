@@ -91,12 +91,12 @@ export default function Dashboard() {
             {loading ? '' : `+${stats?.documents_processed_this_week ?? 0} this week`}
           </div>
         </Card>
-        <Card className="p-5 border-blue-200 bg-blue-50/30">
-          <div className="text-sm font-medium text-blue-800 mb-1">Extraction Accuracy</div>
-          <div className="text-3xl font-semibold text-blue-900">
+        <Card className="p-5 border-brand/20 bg-brand-light/40">
+          <div className="text-sm font-medium text-brand mb-1">Extraction Accuracy</div>
+          <div className="text-3xl font-semibold text-brand">
             {loading || stats?.extraction_accuracy == null ? '—' : `${stats.extraction_accuracy}%`}
           </div>
-          <div className="text-xs text-blue-600 mt-2 font-medium">Across validated fields</div>
+          <div className="text-xs text-brand mt-2 font-medium">Across validated fields</div>
         </Card>
         <Card className="p-5">
           <div className="text-sm font-medium text-slate-500 mb-1">Pending Validation</div>
@@ -117,7 +117,7 @@ export default function Dashboard() {
         ) : projects.length === 0 ? (
           <div className="p-8 text-sm text-slate-500 text-center">
             No projects yet.{' '}
-            <Link to="/projects/new" className="text-blue-600 hover:underline">
+            <Link to="/projects/new" className="text-brand hover:underline">
               Create your first project
             </Link>
             .
@@ -138,7 +138,7 @@ export default function Dashboard() {
                 const status = projectStatusBadge(p)
                 return (
                   <tr key={p.id} className="hover:bg-slate-50 cursor-pointer">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-brand">
                       <Link to={`/projects/${p.id}`}>{p.project_name}</Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">

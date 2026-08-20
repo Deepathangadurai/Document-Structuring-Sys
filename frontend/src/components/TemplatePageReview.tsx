@@ -517,7 +517,7 @@ export default function TemplatePageReview() {
     <div className="p-8 max-w-6xl mx-auto overflow-y-auto h-full pb-20">
       {/* Header */}
       <div className="mb-8">
-        <Link to="/templates/pending" className="text-sm text-blue-600 hover:underline">
+        <Link to="/templates/pending" className="text-sm text-brand hover:underline">
           &larr; Back to Pending Templates
         </Link>
         <div className="flex items-center justify-between mt-2">
@@ -534,7 +534,7 @@ export default function TemplatePageReview() {
         </div>
         <div className="w-full bg-slate-200 rounded-full h-2">
           <div
-            className="bg-blue-600 h-2 rounded-full transition-all"
+            className="bg-brand h-2 rounded-full transition-all"
             style={{ width: `${pageProgress}%` }}
           />
         </div>
@@ -588,9 +588,9 @@ export default function TemplatePageReview() {
             </div>
 
             {/* Structure Summary */}
-            <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-4">
-              <h3 className="font-semibold text-blue-900 mb-2">Structure Detected</h3>
-              <p className="text-blue-800 text-sm">{pageAnalysis.structure_summary}</p>
+            <div className="bg-brand-light border border-brand/20 rounded p-4 mb-4">
+              <h3 className="font-semibold text-brand mb-2">Structure Detected</h3>
+              <p className="text-brand text-sm">{pageAnalysis.structure_summary}</p>
             </div>
 
             {/* Validation Result */}
@@ -656,40 +656,40 @@ export default function TemplatePageReview() {
 
                 {/* Page Fidelity Comparison */}
                 {validationResult.page_fidelity && (
-                  <div className="rounded p-4 mb-4 bg-cyan-50 border border-cyan-200">
-                    <h3 className="font-semibold text-cyan-900 mb-2">🎯 Source Fidelity</h3>
+                  <div className="rounded p-4 mb-4 bg-accent-light border border-accent/30">
+                    <h3 className="font-semibold text-accent mb-2">🎯 Source Fidelity</h3>
                     <div className="space-y-3 text-sm">
                       <div>
-                        <p className="text-cyan-700 font-medium mb-1">Content Coverage</p>
+                        <p className="text-accent font-medium mb-1">Content Coverage</p>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-cyan-200 rounded-full h-2">
+                          <div className="flex-1 bg-accent-light rounded-full h-2">
                             <div
-                              className="bg-cyan-600 h-2 rounded-full"
+                              className="bg-accent h-2 rounded-full"
                               style={{ width: `${validationResult.page_fidelity.coverage_ratio * 100}%` }}
                             />
                           </div>
-                          <span className="text-cyan-600 font-semibold w-12 text-right">
+                          <span className="text-accent font-semibold w-12 text-right">
                             {(validationResult.page_fidelity.coverage_ratio * 100).toFixed(0)}%
                           </span>
                         </div>
-                        <p className="text-xs text-cyan-600 mt-1">
+                        <p className="text-xs text-accent mt-1">
                           {validationResult.page_fidelity.page_coverage.covered_tokens} of {validationResult.page_fidelity.page_coverage.total_tokens} tokens matched
                         </p>
                       </div>
                       <div>
-                        <p className="text-cyan-700 font-medium mb-1">Table Structure Match</p>
+                        <p className="text-accent font-medium mb-1">Table Structure Match</p>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-cyan-200 rounded-full h-2">
+                          <div className="flex-1 bg-accent-light rounded-full h-2">
                             <div
-                              className="bg-cyan-600 h-2 rounded-full"
+                              className="bg-accent h-2 rounded-full"
                               style={{ width: `${validationResult.page_fidelity.table_match_ratio * 100}%` }}
                             />
                           </div>
-                          <span className="text-cyan-600 font-semibold w-12 text-right">
+                          <span className="text-accent font-semibold w-12 text-right">
                             {(validationResult.page_fidelity.table_match_ratio * 100).toFixed(0)}%
                           </span>
                         </div>
-                        <p className="text-xs text-cyan-600 mt-1">Deterministic table row matching</p>
+                        <p className="text-xs text-accent mt-1">Deterministic table row matching</p>
                       </div>
                     </div>
                     {validationResult.page_fidelity.coverage_ratio >= 0.8 && validationResult.page_fidelity.table_match_ratio >= 0.7 ? (
@@ -736,7 +736,7 @@ export default function TemplatePageReview() {
                           ? 'border-red-200 bg-red-50 hover:border-red-300'
                           : isApproved
                           ? 'border-green-200 bg-green-50 hover:border-green-300'
-                          : 'border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50'
+                          : 'border-slate-200 bg-white hover:border-brand hover:bg-brand-light'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -763,7 +763,7 @@ export default function TemplatePageReview() {
           {/* Action Buttons */}
           <div className="space-y-2 mt-4">
             <Button
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full bg-brand hover:bg-brand-dark"
               onClick={handleValidatePage}
               disabled={validating}
             >
@@ -807,7 +807,7 @@ export default function TemplatePageReview() {
           <Card className="p-4 mt-4">
             <h4 className="font-semibold text-sm mb-2">Notes</h4>
             <textarea
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-brand"
               rows={3}
               placeholder="Add notes for this page..."
               value={pageFeedback.notes}

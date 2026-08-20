@@ -1,11 +1,17 @@
 FROM python:3.12-slim
 
-# Install minimal system deps that may be needed for document processing in later phases
+# Install system dependencies including LibreOffice, poppler, tesseract, and fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     tesseract-ocr \
     libreoffice-writer \
+    libreoffice-calc \
+    fonts-dejavu-core \
+    fonts-liberation \
  && rm -rf /var/lib/apt/lists/*
+
+# Set environment variable so Python tools can locate LibreOffice
+ENV LIBREOFFICE_PATH=/usr/bin/libreoffice
 
 WORKDIR /app
 

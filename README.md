@@ -137,3 +137,9 @@ Key values include:
 - The backend syncs template metadata from `templates/*/schema.json` at startup.
 - The frontend and backend are decoupled and can be run independently or via Docker Compose.
 - The model layer talks only to a real Qwen2.5-VL model served through Ollama — there is no mock/dummy provider or fallback. If Ollama is unreachable or the model isn't pulled, `/api/model/health` and any extraction job report that clearly instead of returning fabricated data.
+
+
+##to check ollama
+
+docker exec -it document-structuring-sys-ollama-1 ollama list
+docker compose exec ollama ollama pull qwen2.5vl:7b

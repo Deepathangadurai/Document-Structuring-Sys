@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +246,7 @@ def _pdf_to_page_images(pdf_path: Path, output_dir: Path, dpi: int = 150) -> lis
             try:
                 page = pdf_doc[page_num]
                 mat = fitz.Matrix(dpi / 72, dpi / 72)
-                pix = page.get_pixmap(matrix=mat, alpha=False)
+                pix = page.get_pixmap(matrix=mat,colorspace=fitz.csRGB, alpha=False)
 
                 image_path = output_dir / f"page_{page_num + 1}.png"
                 pix.save(str(image_path))
@@ -263,18 +263,27 @@ def _pdf_to_page_images(pdf_path: Path, output_dir: Path, dpi: int = 150) -> lis
 
 
 def _pdf_page_texts(pdf_path: Path) -> list[str]:
-    if not fitz:
+    if fitz is None:
         return []
+
     try:
         pdf_doc = fitz.open(str(pdf_path))
-        texts = [(page.get_text() or "") for page in pdf_doc]
-        pdf_doc.close()
+        texts: list[str] = []
+        try:
+            for page in pdf_doc:
+                raw_text = page.get_text("text")
+                texts.append(str(raw_text) if raw_text else "")
+        finally:
+            pdf_doc.close()
         return texts
     except Exception as exc:
-        print(f"[schema_inference] failed to extract page texts from {pdf_path}: {exc!r}", flush=True)
+        print(
+            f"[schema_inference] failed to extract page texts from "
+            f"{pdf_path}: {exc!r}",
+            flush=True,
+        )
         return []
-
-
+        
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
@@ -944,6 +953,8 @@ def _render_runs_html(paragraph, field_id: str | None = None, value_start: int |
         if not runs:
             return ""
         should_tag = field_id is not None and value_start is not None
+        tag_field_id = field_id
+        tag_value_start = value_start
         parts: list[str] = []
         consumed = 0
         field_opened = not should_tag
@@ -956,29 +967,29 @@ def _render_runs_html(paragraph, field_id: str | None = None, value_start: int |
             consumed = run_end
             open_tag, close_tag = _run_style_tags(run)
 
-            if should_tag and not field_opened:
-                if run_end <= value_start:
+            if should_tag and not field_opened and tag_field_id is not None and tag_value_start is not None:
+                if run_end <= tag_value_start:
                     parts.append(open_tag + _escape_preserve_spacing(text) + close_tag)
                     continue
-                if run_start < value_start < run_end:
-                    split_at = value_start - run_start
+                if run_start < tag_value_start < run_end:
+                    split_at = tag_value_start - run_start
                     before, after = text[:split_at], text[split_at:]
                     if before:
                         parts.append(open_tag + _escape_preserve_spacing(before) + close_tag)
-                    parts.append(_tag_open(field_id))
+                    parts.append(_tag_open(tag_field_id))
                     field_opened = True
                     parts.append(open_tag + _escape_preserve_spacing(after) + close_tag)
                     continue
-                parts.append(_tag_open(field_id))
+                parts.append(_tag_open(tag_field_id))
                 field_opened = True
 
             parts.append(open_tag + _escape_preserve_spacing(text) + close_tag)
 
-        if should_tag and not field_opened:
-            parts.append(_tag_open(field_id) + "&nbsp;")
+        if should_tag and not field_opened and tag_field_id is not None:
+            parts.append(_tag_open(tag_field_id) + "&nbsp;")
             field_opened = True
-        if should_tag and field_opened:
-            parts.append(_tag_close(field_id))
+        if should_tag and field_opened and tag_field_id is not None:
+            parts.append(_tag_close(tag_field_id))
 
         return "".join(parts)
     except Exception:
@@ -1078,7 +1089,10 @@ def _cell_border_css(tc) -> str:
         return ""
 
 
-def _render_table(table, add_field=None) -> str:
+def _render_table(
+    table,
+    add_field: Callable[[str, str | None], str | None] | None = None,
+) -> str:
     """Render a table matching the source's column widths and merged
     cells (colspan/rowspan), with per-run formatting inside each cell.
 
@@ -1136,7 +1150,7 @@ def _render_table(table, add_field=None) -> str:
                     cell_match = _candidate_field_match(cell_text) if add_field else None
                     cell_match_value = (cell_match.groupdict().get("value") or "").strip() if cell_match else ""
                     cell_is_weak_match = bool(cell_match and cell_match.re is _LABEL_ONLY_RE)
-                    if cell_match and not cell_is_weak_match and cell_match_value:
+                    if add_field is not None and cell_match and not cell_is_weak_match and cell_match_value:
                         cell_field_id = add_field(cell_match.group("label").strip(), cell_match_value)
                     cell_pending_label = (
                         cell_match.group("label").strip()
@@ -1223,7 +1237,8 @@ def _render_table(table, add_field=None) -> str:
                 for row_i, row_cells in enumerate(row_records)
             ]
 
-        if add_field:
+        if add_field is not None:
+            field_adder = add_field
             def _is_label_like(cell: dict) -> bool:
                 text = cell["text"]
                 return bool(
@@ -1253,7 +1268,7 @@ def _render_table(table, add_field=None) -> str:
                     if not cell["tagged"] and cell.get("pending_label_text") and i + 1 < n:
                         value_cell = row_cells[i + 1]
                         if not value_cell["tagged"] and value_cell["text"]:
-                            field_id = add_field(cell["pending_label_text"], value_cell["text"])
+                            field_id = field_adder(cell["pending_label_text"], value_cell["text"])
                             if field_id:
                                 value_cell["html"] = _tag_open(field_id) + value_cell["html"] + _tag_close(field_id)
                                 value_cell["tagged"] = True
@@ -1279,7 +1294,7 @@ def _render_table(table, add_field=None) -> str:
                         _is_label_like(label_cell)
                         and not _looks_like_value_code(label_cell["text"])
                     ):
-                        field_id = add_field(_label_cell_text(label_cell["text"]), value_cell["text"] or None)
+                        field_id = field_adder(_label_cell_text(label_cell["text"]), value_cell["text"] or None)
                         if field_id:
                             value_cell["html"] = _tag_open(field_id) + value_cell["html"] + _tag_close(field_id)
                             value_cell["tagged"] = True
@@ -1301,7 +1316,7 @@ def _render_table(table, add_field=None) -> str:
                             header_label = header_row[col_idx]["text"]
                             if not header_label:
                                 continue
-                            field_id = add_field(f"{header_label} (row {data_row_index})", cell["text"])
+                            field_id = field_adder(f"{header_label} (row {data_row_index})", cell["text"])
                             if field_id:
                                 cell["html"] = _tag_open(field_id) + cell["html"] + _tag_close(field_id)
                                 cell["tagged"] = True

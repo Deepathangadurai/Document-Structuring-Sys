@@ -1,4 +1,5 @@
 import json
+import asyncio
 import httpx
 from app.services.model.base import ModelProvider
 from app.core.config import settings
@@ -8,14 +9,11 @@ class QwenVLProvider(ModelProvider):
     Talks to a local Qwen2.5-VL model served through Ollama's native API.
     """
 
-    # Conservative limits to keep requests comfortably inside the model's
-    # practical context window and avoid Ollama 500s / prompt truncation.
-    # These values are intentionally small because a large schema + page text
-    # payload is a known failure mode in this project.
-    MAX_FIELDS_PER_PROMPT = 2
+    # OPTIMIZATION: Increased batch size from 2 to 8 fields to reduce API round-trips.
+    MAX_FIELDS_PER_PROMPT = 8
     MAX_REFERENCE_TEXT_CHARS = 250
-    MAX_PAGE_TEXT_CHARS = 400
-    MAX_TOTAL_PROMPT_CHARS = 4000
+    MAX_PAGE_TEXT_CHARS = 800
+    MAX_TOTAL_PROMPT_CHARS = 6000
 
     def __init__(self):
         self.provider = "qwen2.5-vl"
@@ -154,6 +152,34 @@ class QwenVLProvider(ModelProvider):
         prompt = "\n".join(prompt_parts)
         return prompt[: self.MAX_TOTAL_PROMPT_CHARS]
 
+    async def _call_ollama_generate_async(self, client: httpx.AsyncClient, prompt: str) -> dict:
+        """Asynchronous API call reusing client session and limiting generation length."""
+        last_error = None
+        for base_url in self._candidate_urls():
+            url = f"{base_url.rstrip('/')}/api/generate"
+            payload = {
+                "model": self.model_name,
+                "prompt": prompt,
+                "format": "json",
+                "stream": False,
+                "options": {
+                    "temperature": 0,
+                    "num_predict": 512,  # Limits runaway generation
+                },
+            }
+            try:
+                response = await client.post(url, json=payload, timeout=self.timeout)
+                response.raise_for_status()
+                data = response.json()
+                self.base_url = base_url
+                return data
+            except Exception as exc:
+                last_error = exc
+                continue
+        if last_error is not None:
+            raise RuntimeError(f"Ollama async request failed: {last_error}")
+        raise RuntimeError("No Ollama endpoints were reachable")
+
     def _call_ollama_generate(self, prompt: str) -> dict:
         last_error = None
         for base_url in self._candidate_urls():
@@ -165,6 +191,7 @@ class QwenVLProvider(ModelProvider):
                 "stream": False,
                 "options": {
                     "temperature": 0,
+                    "num_predict": 512,
                 },
             }
             try:
@@ -174,20 +201,11 @@ class QwenVLProvider(ModelProvider):
                     data = response.json()
                 self.base_url = base_url
                 return data
-            except httpx.TimeoutException as exc:
-                last_error = RuntimeError(f"Ollama request timed out after {self.timeout}s.")
-                continue
-            except httpx.ConnectError as exc:
-                last_error = RuntimeError(f"Could not connect to Ollama: {exc}")
-                continue
-            except httpx.HTTPStatusError as exc:
-                last_error = RuntimeError(f"Ollama returned HTTP {exc.response.status_code}: {exc.response.text[:500]}")
-                continue
             except Exception as exc:
-                last_error = RuntimeError(f"Ollama request failed: {exc}")
+                last_error = exc
                 continue
         if last_error is not None:
-            raise last_error
+            raise RuntimeError(f"Ollama request failed: {last_error}")
         raise RuntimeError("No Ollama endpoints were reachable")
 
     def _section_batches(self, section: dict, max_fields: int | None = None) -> list[dict]:
@@ -204,33 +222,38 @@ class QwenVLProvider(ModelProvider):
             })
         return batches
 
-    def extract(self, template_schema: dict, pages: list[dict]) -> dict:
-        if not self.base_url:
-            raise RuntimeError("MODEL_URL is not configured")
-
-        sections = template_schema.get("sections", [])
-        if not sections:
-            return {
-                "template_id": template_schema.get("template_id"),
-                "template_version": template_schema.get("version"),
-                "fields": [],
-            }
-
-        combined_fields: list[dict] = []
-        for section in sections:
-            for section_batch in self._section_batches(section):
-                section_schema = {
-                    **template_schema,
-                    "sections": [section_batch],
-                }
-                section_result = self._extract_single_schema(section_schema, pages)
-                combined_fields.extend(section_result.get("fields", []))
-
-        return {
-            "template_id": template_schema.get("template_id"),
-            "template_version": template_schema.get("version"),
-            "fields": combined_fields,
+    def _filter_valid_fields(self, template_schema: dict, parsed: dict) -> dict:
+        """Filters out hallucinative fields (like scope_label) not present in schema."""
+        valid_field_ids = {
+            field.get("field_id")
+            for section in template_schema.get("sections", [])
+            for field in section.get("fields", [])
+            if field.get("field_id")
         }
+
+        filtered_fields = [
+            field for field in parsed.get("fields", [])
+            if isinstance(field, dict) and field.get("field_id") in valid_field_ids
+        ]
+
+        parsed["fields"] = filtered_fields
+        return parsed
+
+    async def _extract_single_schema_async(self, client: httpx.AsyncClient, template_schema: dict, pages: list[dict]) -> dict:
+        prompt = self._build_prompt(template_schema, pages)
+        data = await self._call_ollama_generate_async(client, prompt)
+        raw_text = data.get("response", "")
+        try:
+            parsed = json.loads(raw_text)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise RuntimeError(f"Model response was not valid JSON ({exc}).") from exc
+
+        if not isinstance(parsed, dict) or "fields" not in parsed:
+            raise RuntimeError("Model response missing expected 'fields' key.")
+        if not isinstance(parsed.get("fields", []), list):
+            raise RuntimeError("Model response 'fields' key was not a list.")
+
+        return self._filter_valid_fields(template_schema, parsed)
 
     def _extract_single_schema(self, template_schema: dict, pages: list[dict]) -> dict:
         prompt = self._build_prompt(template_schema, pages)
@@ -245,7 +268,55 @@ class QwenVLProvider(ModelProvider):
             raise RuntimeError("Model response missing expected 'fields' key.")
         if not isinstance(parsed.get("fields", []), list):
             raise RuntimeError("Model response 'fields' key was not a list.")
-        return parsed
+
+        return self._filter_valid_fields(template_schema, parsed)
+
+    async def extract_async(self, template_schema: dict, pages: list[dict]) -> dict:
+        if not self.base_url:
+            raise RuntimeError("MODEL_URL is not configured")
+
+        sections = template_schema.get("sections", [])
+        if not sections:
+            return {
+                "template_id": template_schema.get("template_id"),
+                "template_version": template_schema.get("version"),
+                "fields": [],
+            }
+
+        batch_schemas = []
+        for section in sections:
+            for section_batch in self._section_batches(section):
+                batch_schemas.append({
+                    **template_schema,
+                    "sections": [section_batch],
+                })
+
+        async with httpx.AsyncClient() as client:
+            tasks = [self._extract_single_schema_async(client, schema, pages) for schema in batch_schemas]
+            results = await asyncio.gather(*tasks)
+
+        combined_fields: list[dict] = []
+        for section_result in results:
+            combined_fields.extend(section_result.get("fields", []))
+
+        return {
+            "template_id": template_schema.get("template_id"),
+            "template_version": template_schema.get("version"),
+            "fields": combined_fields,
+        }
+
+    def extract(self, template_schema: dict, pages: list[dict]) -> dict:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import nest_asyncio
+            nest_asyncio.apply()
+            return loop.run_until_complete(self.extract_async(template_schema, pages))
+        else:
+            return asyncio.run(self.extract_async(template_schema, pages))
 
     def extract_batch(self, template_schema: dict, pages: list[dict]) -> dict:
         return self.extract(template_schema, pages)
@@ -261,7 +332,7 @@ class QwenVLProvider(ModelProvider):
                 "model": self.model_name,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"temperature": 0.3},
+                "options": {"temperature": 0.3, "num_predict": 512},
             }
             try:
                 with httpx.Client(timeout=self.timeout) as client:

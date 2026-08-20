@@ -4,10 +4,12 @@ import type {
   CreateExtractionRequest,
   CreateProjectRequest,
   DashboardStatsResponse,
+  DetectedSpecificationResponse,
   DocumentMetadataResponse,
   ExtractionJobResponse,
   FieldUpdateRequest,
   ExtractedFieldResponse,
+  FieldVerificationResponse,
   PageResponse,
   PendingTemplateResponse,
   PendingTemplateUpdateRequest,
@@ -129,6 +131,29 @@ export async function uploadDocument(projectId: number, file: File): Promise<Doc
 
 export async function listProjectDocuments(projectId: number): Promise<DocumentMetadataResponse[]> {
   return fetchJson(`${API_BASE}/projects/${projectId}/documents`)
+}
+
+// ---- Specification detection & matching ----
+// Runs Docling/OCR page-by-page over the project's uploaded source
+// document, checks which of the master templates (13 in production; the
+// 3 sample templates for now) it can find inside it, and returns one
+// entry per detected specification with a match confidence and the pages
+// it was found on. NEW backend endpoint — not implemented server-side yet.
+export async function detectSpecifications(projectId: number): Promise<DetectedSpecificationResponse[]> {
+  return handleResponse(
+    await fetch(`${API_BASE}/projects/${projectId}/detect-specifications`, {
+      method: 'POST',
+      cache: 'no-store',
+    }),
+  )
+}
+
+// Runs "Verify Document & Template" for a completed extraction job:
+// compares every extracted value against what its matched template
+// requires and returns a MATCH / MISMATCH / NOT FOUND / REVIEW verdict
+// per field. NEW backend endpoint — not implemented server-side yet.
+export async function verifyExtraction(jobId: number): Promise<FieldVerificationResponse[]> {
+  return fetchJson(`${API_BASE}/extraction/${jobId}/verify`)
 }
 
 export async function listDocumentPages(documentId: number): Promise<PageResponse[]> {

@@ -189,7 +189,7 @@ export default function TemplateReview() {
     return (
       <div className="p-8 max-w-4xl mx-auto">
         <p className="text-sm text-red-800">{error || 'Template not found.'}</p>
-        <Link to="/templates/pending" className="text-sm text-blue-600 hover:underline">
+        <Link to="/templates/pending" className="text-sm text-brand hover:underline">
           &larr; Back to pending review
         </Link>
       </div>
@@ -198,7 +198,7 @@ export default function TemplateReview() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto overflow-y-auto h-full pb-24">
-      <Link to="/templates/pending" className="text-sm text-blue-600 hover:underline">
+      <Link to="/templates/pending" className="text-sm text-brand hover:underline">
         &larr; Back to pending review
       </Link>
 
@@ -244,7 +244,7 @@ export default function TemplateReview() {
         {template.text_preview ? (
           <button
             type="button"
-            className="text-xs text-blue-600 hover:underline mt-2"
+            className="text-xs text-brand hover:underline mt-2"
             onClick={() => setShowSource((v) => !v)}
           >
             {showSource ? 'Hide source text' : 'Show extracted source text'}
@@ -273,7 +273,7 @@ export default function TemplateReview() {
           <Card key={sectionIdx} className="p-5">
             <div className="flex items-center gap-3 mb-3">
               <input
-                className="flex-1 font-semibold text-slate-900 text-sm border-b border-transparent hover:border-slate-300 focus:border-blue-400 focus:outline-none px-1 py-1"
+                className="flex-1 font-semibold text-slate-900 text-sm border-b border-transparent hover:border-slate-300 focus:border-brand focus:outline-none px-1 py-1"
                 value={section.section_name}
                 onChange={(e) =>
                   setSections((prev) =>
@@ -333,7 +333,7 @@ export default function TemplateReview() {
       </div>
 
       <div className="mt-8 flex gap-3 sticky bottom-0 bg-white py-4 border-t border-slate-200">
-        <Button variant="outline" onClick={handleReject} disabled={busy === 'reject'}>
+        <Button variant="ghost" onClick={handleReject} disabled={busy === 'reject'}>
           Discard
         </Button>
         <Button variant="secondary" onClick={handleSave} disabled={busy === 'save'}>

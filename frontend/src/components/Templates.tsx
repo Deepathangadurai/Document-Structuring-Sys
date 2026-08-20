@@ -120,7 +120,7 @@ export default function Templates() {
                 <Card
                   key={t.template_id}
                   className={`p-5 cursor-pointer transition-all ${
-                    isSelected ? 'ring-2 ring-blue-500 border-blue-500' : 'hover:border-slate-300'
+                    isSelected ? 'ring-2 ring-brand border-brand' : 'hover:border-slate-300'
                   }`}
                 >
                   <div>

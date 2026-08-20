@@ -56,9 +56,9 @@ export interface PendingTemplateUpdateRequest {
 export interface ProjectResponse {
   id: number
   project_name: string
-  template_id: string
-  template_name: string
-  template_version: string
+  template_id?: string | null
+  template_name?: string | null
+  template_version?: string | null
   status: string
   created_at: string
   updated_at: string
@@ -99,6 +99,10 @@ export interface ExtractedFieldResponse {
   value?: string | null
   confidence?: number | null
   validation_status: string
+  // Result of comparing this value to the matched template's requirement
+  // during "Verify Document & Template". Optional because it's only
+  // populated after a verify pass has run for the job.
+  verification_status?: VerificationStatus | null
   source_references: SourceReferenceResponse[]
 }
 
@@ -107,6 +111,8 @@ export interface ExtractionJobResponse {
   project_id: number
   document_id: number
   template_id: number
+  template_code?: string | null
+  template_name?: string | null
   status: string
   progress: number
   current_page: number
@@ -120,11 +126,41 @@ export interface ExtractionJobResponse {
 
 export interface CreateProjectRequest {
   project_name: string
+  template_id?: string
+  project_code?: string
+}
+
+// ---- Specification detection & matching (new multi-spec workflow) ----
+// A project now starts from ONE uploaded source document. The backend scans
+// it against all master templates (13 in production; 3 sample templates —
+// specification_01/02/03 — while the rest are being added) and reports
+// which specifications it found and how confident it is in each match.
+export type SpecMatchStatus = 'matched' | 'review' | 'not_found'
+
+export interface DetectedSpecificationResponse {
   template_id: string
+  template_name: string
+  specification_number?: string | null
+  match_status: SpecMatchStatus
+  match_confidence: number // 0-1
+  matched_pages: number[]
+}
+
+// ---- Verification (MATCH / MISMATCH / NOT FOUND / REVIEW) ----
+// Produced by "Verify Document & Template": compares each extracted value
+// against what the matched master template requires.
+export type VerificationStatus = 'match' | 'mismatch' | 'not_found' | 'review'
+
+export interface FieldVerificationResponse {
+  field_id: string
+  status: VerificationStatus
+  expected_hint?: string | null
+  reason?: string | null
 }
 
 export interface CreateExtractionRequest {
   document_id: number
+  template_id?: string
 }
 
 export interface FieldUpdateRequest {

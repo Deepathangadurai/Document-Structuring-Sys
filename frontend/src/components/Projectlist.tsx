@@ -61,7 +61,7 @@ export default function ProjectsList() {
         ) : projects.length === 0 ? (
           <div className="p-8 text-sm text-slate-500 text-center">
             No projects yet.{' '}
-            <Link to="/projects/new" className="text-blue-600 hover:underline">
+            <Link to="/projects/new" className="text-brand hover:underline">
               Create your first project
             </Link>
             .
@@ -82,7 +82,7 @@ export default function ProjectsList() {
                 const status = projectStatusBadge(p)
                 return (
                   <tr key={p.id} className="hover:bg-slate-50 cursor-pointer">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-brand">
                       <Link to={`/projects/${p.id}`}>{p.project_name}</Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
