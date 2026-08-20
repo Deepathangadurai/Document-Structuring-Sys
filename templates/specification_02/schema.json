@@ -1,10 +1,10 @@
 {
-  "template_id": "specification_02",
-  "template_name": "Specification 02",
+  "template_id": "specification_01",
+  "template_name": "ELECTRICAL DESIGN BASIS",
   "version": "1.0",
-  "specification_number": "IP009-43-03-01-P.DOC",
-  "description": "Master template definition for Specification 02.",
-  "file_name": "IP009-43-03-01-P.DOC",
+  "specification_number": "IP009-43-00-01-0",
+  "description": "Master template definition for Specification 01.",
+  "file_name": "IP009-43-00-01-0.doc",
   "structure_locked": true,
   "sections": [
     {
@@ -20,11 +20,11 @@
           "validation_rules": []
         },
         {
-          "field_id": "revision",
-          "field_label": "Revision",
+          "field_id": "project_number",
+          "field_label": "Project Number",
           "data_type": "string",
           "required": false,
-          "extraction_hint": "Extract the revision identifier.",
+          "extraction_hint": "Extract the project number if available.",
           "validation_rules": []
         }
       ]

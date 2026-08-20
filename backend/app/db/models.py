@@ -38,8 +38,16 @@ class Project(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_name = Column(String, nullable=False)
-    template_id = Column(Integer, ForeignKey("templates.id"), nullable=False)
-    template_version = Column(String, nullable=False)
+    # Human-assigned identifier (requirement: "User creates a project with
+    # Project ID"). Free-text, not a DB primary key, so it can match
+    # whatever numbering scheme the org already uses.
+    project_code = Column(String, nullable=True, index=True)
+    # A project used to require a template up front. Now a project starts
+    # from ONE uploaded document, and specifications (-> templates) are
+    # detected from it, so this is nullable and mostly vestigial - kept
+    # for backward compatibility with the old single-template flow.
+    template_id = Column(Integer, ForeignKey("templates.id"), nullable=True)
+    template_version = Column(String, nullable=True)
     status = Column(String, nullable=False, default="draft")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -109,6 +117,11 @@ class ExtractedField(Base):
     value = Column(Text, nullable=True)
     confidence = Column(Float, nullable=True)
     validation_status = Column(String, nullable=False, default="pending")
+    # Result of "Verify Document & Template" (MATCH / MISMATCH / NOT FOUND /
+    # REVIEW). Separate from validation_status, which tracks the human
+    # accept/edit/reject workflow - this tracks the automated comparison
+    # against what the matched master template requires.
+    verification_status = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     extraction_job = relationship("ExtractionJob", back_populates="extracted_fields")

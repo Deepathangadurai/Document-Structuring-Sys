@@ -21,11 +21,12 @@ class ProjectService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_project(self, project_name: str, template: Template) -> Project:
+    def create_project(self, project_name: str, template: Optional[Template] = None, project_code: Optional[str] = None) -> Project:
         project = Project(
             project_name=project_name,
-            template_id=template.id,
-            template_version=template.version,
+            project_code=project_code,
+            template_id=template.id if template else None,
+            template_version=template.version if template else None,
             status="active",
         )
         self.db.add(project)
@@ -99,8 +100,9 @@ class ProjectService:
         return {
             "id": project.id,
             "project_name": project.project_name,
-            "template_id": project.template.template_id,
-            "template_name": project.template.template_name,
+            "project_code": project.project_code,
+            "template_id": project.template.template_id if project.template else None,
+            "template_name": project.template.template_name if project.template else None,
             "template_version": project.template_version,
             "status": project.status,
             "created_at": _format_datetime(created_at) or "",
@@ -135,12 +137,15 @@ class ProjectService:
             job_created_at = getattr(job, "created_at", None)
             job_started_at = getattr(job, "started_at", None)
             job_completed_at = getattr(job, "completed_at", None)
+            job_template = job.template
             extraction_jobs.append(
                 {
                     "id": job.id,
                     "project_id": job.project_id,
                     "document_id": job.document_id,
                     "template_id": job.template_id,
+                    "template_code": job_template.template_id if job_template else None,
+                    "template_name": job_template.template_name if job_template else None,
                     "status": job.status,
                     "progress": job.progress,
                     "current_page": job.current_page,
@@ -157,8 +162,9 @@ class ProjectService:
         return {
             "id": project.id,
             "project_name": project.project_name,
-            "template_id": project.template.template_id,
-            "template_name": project.template.template_name,
+            "project_code": project.project_code,
+            "template_id": project.template.template_id if project.template else None,
+            "template_name": project.template.template_name if project.template else None,
             "template_version": project.template_version,
             "status": project.status,
             "created_at": _format_datetime(created_at) or "",
@@ -237,11 +243,17 @@ class ExtractionService:
         # a clear error (see process_job), not 500 every status check.
         self.document_service = DocumentService(db)
 
-    def create_job(self, project: Project, document: Document) -> ExtractionJob:
+    def create_job(self, project: Project, document: Document, template: Optional[Template] = None) -> ExtractionJob:
+        # `template` is the specific matched specification this job is for.
+        # Falls back to project.template_id for backward compatibility with
+        # the old single-template-per-project flow.
+        resolved_template_id = template.id if template else project.template_id
+        if resolved_template_id is None:
+            raise ValueError("No template specified for this extraction job")
         job = ExtractionJob(
             project_id=project.id,
             document_id=document.id,
-            template_id=project.template_id,
+            template_id=resolved_template_id,
             status="pending",
             progress=0,
             current_page=0,
@@ -269,10 +281,24 @@ class ExtractionService:
         if value is not None:
             field.value = value  # type: ignore[assignment]
         field.validation_status = validation_status  # type: ignore[assignment]
+        # Any edit/accept/reject invalidates the last "Verify Document &
+        # Template" pass for this field - it must be re-run to reflect the
+        # new value rather than showing a stale verdict.
+        field.verification_status = None  # type: ignore[assignment]
         self.db.add(field)
         self.db.commit()
         self.db.refresh(field)
         return field
+
+    def store_verification_results(self, job_id: int, results: list[dict]) -> None:
+        by_field_id = {r["field_id"]: r for r in results}
+        fields = self.db.query(ExtractedField).filter_by(extraction_job_id=job_id).all()
+        for field in fields:
+            result = by_field_id.get(field.field_id)
+            if result:
+                field.verification_status = result["status"]  # type: ignore[assignment]
+                self.db.add(field)
+        self.db.commit()
 
     def get_job_results(self, job: ExtractionJob) -> dict:
         fields = []
@@ -293,17 +319,21 @@ class ExtractionService:
                     "value": extracted.value,
                     "confidence": extracted.confidence,
                     "validation_status": extracted.validation_status,
+                    "verification_status": extracted.verification_status,
                     "source_references": sources,
                 }
             )
         created_at = getattr(job, "created_at", None)
         started_at = getattr(job, "started_at", None)
         completed_at = getattr(job, "completed_at", None)
+        job_template = job.template
         return {
             "id": job.id,
             "project_id": job.project_id,
             "document_id": job.document_id,
             "template_id": job.template_id,
+            "template_code": job_template.template_id if job_template else None,
+            "template_name": job_template.template_name if job_template else None,
             "status": job.status,
             "progress": job.progress,
             "current_page": job.current_page,
@@ -598,9 +628,12 @@ class ExtractionService:
             if field_id:
                 extracted_values[field_id] = value
 
+        # Explicitly cast template.schema to dict[str, Any] for type safety
+        schema_dict = cast(dict[str, Any], template.schema)
+
         # Attempt template population
         try:
-            engine = TemplatePopulationEngine(template_docx, template.schema)
+            engine = TemplatePopulationEngine(template_docx, schema_dict)
             population_success, population_report = engine.populate(
                 extracted_values,
                 Path(output_path),
@@ -612,7 +645,7 @@ class ExtractionService:
                 validation_result = DocumentIntegrityValidator.validate_field_replacement_only(
                     template_docx,
                     Path(output_path),
-                    template.schema,
+                    schema_dict,
                 )
                 
                 if validation_result.is_valid:

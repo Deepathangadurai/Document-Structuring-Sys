@@ -81,14 +81,19 @@ class PendingTemplateUpdateRequest(BaseModel):
 
 class CreateProjectRequest(BaseModel):
     project_name: str
-    template_id: str
+    project_code: Optional[str] = None
+    # Optional now: a project starts from ONE uploaded document and
+    # specifications are detected from it. Kept for backward compatibility
+    # with the old up-front-template flow.
+    template_id: Optional[str] = None
 
 class ProjectResponse(BaseModel):
     id: int
     project_name: str
-    template_id: str
-    template_name: str
-    template_version: str
+    project_code: Optional[str] = None
+    template_id: Optional[str] = None
+    template_name: Optional[str] = None
+    template_version: Optional[str] = None
     status: str
     created_at: str
     updated_at: str
@@ -121,6 +126,11 @@ class DocumentMetadataResponse(BaseModel):
 
 class CreateExtractionRequest(BaseModel):
     document_id: int
+    # Which detected specification (master template) to extract this
+    # document against. String template_id (e.g. "specification_01"), not
+    # the numeric DB id. Optional for backward compatibility with the old
+    # flow where the project itself carried a single template.
+    template_id: Optional[str] = None
 
 class SourceReferenceResponse(BaseModel):
     page_number: Optional[int] = None
@@ -137,6 +147,7 @@ class ExtractedFieldResponse(BaseModel):
     value: Optional[str] = None
     confidence: Optional[float] = None
     validation_status: str
+    verification_status: Optional[str] = None
     source_references: List[SourceReferenceResponse] = Field(default_factory=list)
 
     class Config:
@@ -147,6 +158,8 @@ class ExtractionJobResponse(BaseModel):
     project_id: int
     document_id: int
     template_id: int
+    template_code: Optional[str] = None
+    template_name: Optional[str] = None
     status: str
     progress: int
     current_page: int
@@ -159,6 +172,26 @@ class ExtractionJobResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class DetectedSpecificationResponse(BaseModel):
+    """One entry per master template checked against a project's uploaded
+    source document (see SpecificationMatcher). match_status is one of
+    'matched' | 'review' | 'not_found'."""
+    template_id: str
+    template_name: str
+    specification_number: Optional[str] = None
+    match_status: str
+    match_confidence: float
+    matched_pages: List[int] = Field(default_factory=list)
+
+class FieldVerificationResponse(BaseModel):
+    """Result of comparing one extracted value against what its matched
+    template requires. status is one of
+    'match' | 'mismatch' | 'not_found' | 'review'."""
+    field_id: str
+    status: str
+    expected_hint: Optional[str] = None
+    reason: Optional[str] = None
 
 class ModelHealthResponse(BaseModel):
     available: bool

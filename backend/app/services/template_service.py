@@ -98,6 +98,9 @@ class TemplateService:
         if not self.template_base_path.exists():
             return
 
+        # Track template IDs processed during this sync run (both existing DB entries and newly added ones)
+        seen_template_ids: set[str] = set()
+
         for child in sorted(self.template_base_path.iterdir()):
             if not child.is_dir():
                 continue
@@ -107,6 +110,10 @@ class TemplateService:
 
             template_id = schema.get("template_id")
             if not template_id or not isinstance(template_id, str):
+                continue
+
+            # Skip duplicate template_id entries in the disk directory structure during the same sync cycle
+            if template_id in seen_template_ids:
                 continue
 
             version_val = str(schema.get("version") or "1.0")
@@ -174,6 +181,7 @@ class TemplateService:
                     updated = True
                 if updated:
                     self.db.add(template)
+                seen_template_ids.add(template_id)
             else:
                 # A template folder that's never been seen before. Don't
                 # trust schema.json's (often placeholder) field list or
@@ -221,6 +229,7 @@ class TemplateService:
                     structure_locked=structure_locked_val,
                 )
                 self.db.add(template)
+                seen_template_ids.add(template_id)
 
         self.db.commit()
 
@@ -404,12 +413,23 @@ class TemplateService:
         if total_fields == 0:
             raise ValueError("Add at least one field before approving this template")
 
-        # Lock in the final template_id from the (possibly edited) name so it
-        # doesn't collide with anything approved in the meantime.
-        final_id = self._unique_template_id(cast(str, getattr(template, "template_name")), exclude_id=cast(int, template.id))
-        setattr(template, "template_id", final_id)
-        schema_data["template_id"] = final_id
-        setattr(template, "schema", schema_data)
+        current_template_id = cast(str, getattr(template, "template_id"))
+        # Deploy-time templates (dropped into /templates/<template_id>/ and
+        # picked up by sync_templates()) already have a template_id that IS
+        # their on-disk folder name - export/population later looks the
+        # master .docx up via `template_base_path / template.template_id`.
+        # Re-slugging template_id from a (possibly just-edited) display
+        # name would silently break that lookup for every one of the 13
+        # master templates the moment someone renames one to its real spec
+        # title. Only re-derive template_id for templates that genuinely
+        # have no matching folder on disk - i.e. ones uploaded through the
+        # app's own upload flow, which never had a folder to begin with.
+        has_disk_folder = (self.template_base_path / current_template_id).is_dir()
+        if not has_disk_folder:
+            final_id = self._unique_template_id(cast(str, getattr(template, "template_name")), exclude_id=cast(int, template.id))
+            setattr(template, "template_id", final_id)
+            schema_data["template_id"] = final_id
+            setattr(template, "schema", schema_data)
         setattr(template, "is_active", True)
         setattr(template, "status", "active")
         self.db.add(template)

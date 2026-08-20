@@ -52,6 +52,21 @@ def run_startup_migrations(bind_engine=None) -> None:
     if "structure_signature" not in existing_columns:
         statements.append("ALTER TABLE templates ADD COLUMN structure_signature JSON")
 
+    if "projects" in inspector.get_table_names():
+        project_columns = {col["name"] for col in inspector.get_columns("projects")}
+        if "project_code" not in project_columns:
+            statements.append("ALTER TABLE projects ADD COLUMN project_code VARCHAR")
+        # SQLite can't drop a NOT NULL constraint with ALTER TABLE. Projects
+        # created before the multi-specification workflow always have a
+        # template_id, so leaving the old NOT NULL in place on an existing
+        # DB is harmless - it only matters for brand new databases, which
+        # get the nullable column straight from create_all().
+
+    if "extracted_fields" in inspector.get_table_names():
+        field_columns = {col["name"] for col in inspector.get_columns("extracted_fields")}
+        if "verification_status" not in field_columns:
+            statements.append("ALTER TABLE extracted_fields ADD COLUMN verification_status VARCHAR")
+
     if not statements:
         return
 
