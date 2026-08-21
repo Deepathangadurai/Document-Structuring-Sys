@@ -66,6 +66,15 @@ def run_startup_migrations(bind_engine=None) -> None:
         field_columns = {col["name"] for col in inspector.get_columns("extracted_fields")}
         if "verification_status" not in field_columns:
             statements.append("ALTER TABLE extracted_fields ADD COLUMN verification_status VARCHAR")
+        if "original_value" not in field_columns:
+            # Backfill existing rows' original_value from their current value
+            # so Undo has *something* to restore to for fields extracted
+            # before this column existed, even though that "original" may
+            # already reflect a prior edit for rows modified before the
+            # upgrade - there's no way to recover the true pre-edit value
+            # for those older rows.
+            statements.append("ALTER TABLE extracted_fields ADD COLUMN original_value TEXT")
+            statements.append("UPDATE extracted_fields SET original_value = value WHERE original_value IS NULL")
 
     if not statements:
         return

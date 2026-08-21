@@ -125,7 +125,10 @@ export default function ProjectDetail() {
   const jobForSelectedDocument = selectedJob
 
   // Reset to page 1, clear unsaved edits, and clear any stale verification
-  // results whenever the selected specification (job) changes.
+  // results whenever the selected specification (job) changes. The actual
+  // "are you sure" check for discarding unsaved edits happens at the call
+  // site (selectJob below), not here - by the time this effect sees a new
+  // selectedJobId the switch has already been confirmed.
   useEffect(() => {
     setActivePage(1)
     setEdits({})
@@ -133,6 +136,23 @@ export default function ProjectDetail() {
     setVerifyError(null)
     setShowVerifyPanel(false)
   }, [selectedJobId])
+
+  // Guarded setter: switching specs while there are un-saved edits (typed
+  // in the document but never Approved/Saved/Rejected) would otherwise
+  // silently discard them, since the effect above wipes `edits` on every
+  // job change. This is the only place selectedJobId should be set from
+  // user interaction.
+  function selectJob(jobId: number) {
+    if (jobId === selectedJobId) return
+    if (Object.keys(edits).length > 0) {
+      const ok = window.confirm(
+        `You have ${Object.keys(edits).length} unsaved edit(s) on this specification. ` +
+          `Switching will discard them unless you Approve or Save them first. Continue anyway?`,
+      )
+      if (!ok) return
+    }
+    setSelectedJobId(jobId)
+  }
 
   // Fetch the *template's* rendered page HTML - this is the actual output
   // document's structure (tables, headings, layout), not a re-parse of the
@@ -302,6 +322,64 @@ export default function ProjectDetail() {
     }
   }
 
+  // Saving an edit without approving/rejecting it. Requirement #11 asks
+  // for Accept, Edit, or Reject as three distinct actions, but until now
+  // "Edit" only ever persisted if the user also clicked Approve - typing
+  // in the document and then switching specs (which clears `edits`, see
+  // the effect above) silently discarded the change with no save and no
+  // warning. This persists the edited value with status "review" (edited,
+  // not yet approved) so it survives a job switch/reload and is visibly
+  // flagged as needing a follow-up look, distinct from both "verified"
+  // and "pending" (never touched).
+  async function handleSaveEdit(field: ExtractedFieldResponse) {
+    if (!jobForSelectedDocument) return
+    const value = edits[field.field_id] ?? getFieldDisplayValue(field)
+    if (value === getFieldDisplayValue(field) && field.validation_status !== 'pending') return
+    setSavingFieldId(field.field_id)
+    try {
+      await updateExtractedField(jobForSelectedDocument.id, field.field_id, {
+        value,
+        validation_status: 'review',
+      })
+      setEdits((prev) => {
+        const next = { ...prev }
+        delete next[field.field_id]
+        return next
+      })
+      await loadProject()
+    } catch (err) {
+      setError(`Could not save edit: ${(err as Error).message}`)
+    } finally {
+      setSavingFieldId(null)
+    }
+  }
+
+  // Restore this field back to what extraction originally produced,
+  // discarding any edit/approve/reject that's happened since. Distinct
+  // from Reject (which clears the value to blank and marks it rejected) -
+  // Undo puts back the model's original output and resets status to
+  // "pending" so it goes through Accept/Edit/Reject again from scratch.
+  async function handleUndo(field: ExtractedFieldResponse) {
+    if (!jobForSelectedDocument) return
+    setSavingFieldId(field.field_id)
+    try {
+      await updateExtractedField(jobForSelectedDocument.id, field.field_id, {
+        value: field.original_value ?? '',
+        validation_status: 'pending',
+      })
+      setEdits((prev) => {
+        const next = { ...prev }
+        delete next[field.field_id]
+        return next
+      })
+      await loadProject()
+    } catch (err) {
+      setError(`Could not undo field: ${(err as Error).message}`)
+    } finally {
+      setSavingFieldId(null)
+    }
+  }
+
   // Rejecting clears the value out of the document (back to blank, the
   // same as an un-filled template placeholder) rather than just hiding it
   // in a UI list - the span in the document reflects the rejection
@@ -384,7 +462,7 @@ export default function ProjectDetail() {
                   return (
                     <li key={job.id}>
                       <button
-                        onClick={() => setSelectedJobId(job.id)}
+                        onClick={() => selectJob(job.id)}
                         className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${
                           selectedJobId === job.id ? 'bg-brand-light' : ''
                         }`}
@@ -473,7 +551,7 @@ export default function ProjectDetail() {
             <Card className="p-4">
               <h3 className="font-semibold mb-1 text-sm">Values on This Page</h3>
               <p className="text-xs text-slate-500 mb-3">
-                Edit values directly in the document. Approve or reject each one here.
+                Edit values directly in the document, then Save (mark for review), Approve, or Reject each one here.
               </p>
               {!jobForSelectedDocument ? (
                 <p className="text-slate-500 text-sm">No extraction job for this document yet.</p>
@@ -502,6 +580,15 @@ export default function ProjectDetail() {
                         </button>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Badge type={field.validation_status}>{field.validation_status}</Badge>
+                          {edits[field.field_id] !== undefined &&
+                          edits[field.field_id] !== getFieldDisplayValue(field) ? (
+                            <span
+                              className="text-[10px] font-medium text-amber-600"
+                              title="Typed in the document but not yet saved, approved, or rejected"
+                            >
+                              unsaved
+                            </span>
+                          ) : null}
                           {verdict ? (
                             <Badge type={verifyBadgeType(verdict.status)} title={verdict.reason ?? undefined}>
                               {verifyLabel(verdict.status)}
@@ -511,6 +598,26 @@ export default function ProjectDetail() {
                             <span className="text-[10px] text-slate-400">{Math.round(field.confidence * 100)}%</span>
                           ) : null}
                           <div className="flex-1" />
+                          {field.original_value !== undefined &&
+                          field.original_value !== null &&
+                          (currentValue !== field.original_value || field.validation_status !== 'pending') ? (
+                            <button
+                              disabled={isSaving}
+                              onClick={() => void handleUndo(field)}
+                              className="text-slate-500 hover:text-slate-700 disabled:opacity-30"
+                              title={`Undo back to original extracted value: "${field.original_value}"`}
+                            >
+                              <Icons.Undo className="w-4 h-4" />
+                            </button>
+                          ) : null}
+                          <button
+                            disabled={isSaving || edits[field.field_id] === undefined}
+                            onClick={() => void handleSaveEdit(field)}
+                            className="text-amber-600 hover:text-amber-700 disabled:opacity-30"
+                            title="Save this edit for review (without approving or rejecting it)"
+                          >
+                            <Icons.Edit className="w-4 h-4" />
+                          </button>
                           <button
                             disabled={isSaving}
                             onClick={() => void handleApprove(field)}

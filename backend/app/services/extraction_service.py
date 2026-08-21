@@ -317,6 +317,7 @@ class ExtractionService:
                     "field_id": extracted.field_id,
                     "field_label": extracted.field_label,
                     "value": extracted.value,
+                    "original_value": extracted.original_value,
                     "confidence": extracted.confidence,
                     "validation_status": extracted.validation_status,
                     "verification_status": extracted.verification_status,
@@ -460,7 +461,14 @@ class ExtractionService:
             "template_version": schema_dict.get("version"),
             "fields": list(accumulated_fields.values()),
         }
-        self._store_extracted_fields(job, final_output, document)
+        # Now that every page chunk has had a chance to contribute a value,
+        # check required-ness once against the final, fully-accumulated
+        # result - not per-chunk raw model output (see _validate_output).
+        # Required fields still empty at this point get flagged for manual
+        # entry (validation_status="missing") rather than failing the job;
+        # everything else that WAS found is stored and usable regardless.
+        required_missing_ids = self._required_missing_field_ids(final_output, schema_dict)
+        self._store_extracted_fields(job, final_output, document, required_missing_ids)
 
         job.progress = 100  # type: ignore[assignment]
         job.current_page = job.total_pages  # type: ignore[assignment]
@@ -468,6 +476,28 @@ class ExtractionService:
         job.completed_at = datetime.utcnow()  # type: ignore[assignment]
         self.db.add(job)
         self.db.commit()
+
+    def _required_missing_field_ids(self, model_output: dict, schema: dict) -> set[str]:
+        """Field IDs that are marked required in the schema but still have
+        no value (None or blank after stripping) in the final, fully
+        accumulated extraction output."""
+        required_ids = {
+            field["field_id"]
+            for section in schema.get("sections", [])
+            for field in section.get("fields", [])
+            if field.get("required")
+        }
+        if not required_ids:
+            return set()
+
+        by_id = {f.get("field_id"): f for f in model_output.get("fields", []) if isinstance(f, dict)}
+        missing: set[str] = set()
+        for field_id in required_ids:
+            value = by_id.get(field_id, {}).get("value")
+            normalized = value.strip() if isinstance(value, str) else value
+            if normalized is None or normalized == "":
+                missing.add(field_id)
+        return missing
 
     def _chunk_pages(self, pages, chunk_size: int):
         if chunk_size <= 0:
@@ -530,13 +560,17 @@ class ExtractionService:
             if source.get("confidence") is not None and not isinstance(source.get("confidence"), (float, int)):
                 return False, "Invalid source confidence"
 
-            raw_value = field.get("value")
-            normalized_value = raw_value.strip() if isinstance(raw_value, str) else raw_value
-            if field_info["required"] and (normalized_value is None or normalized_value == ""):
-                return False, (
-                    f"Missing required value for '{field_info['field_label']}' (field_id={field_id}). "
-                    "This value is required and cannot be left blank; missing values are dangerous for project names/IDs."
-                )
+            # Missing required values used to fail the entire extraction job
+            # here - discarding every other field already found (including
+            # ones from earlier page chunks already sitting in
+            # accumulated_fields) just because one chunk's raw model output
+            # didn't have this particular field on it yet. A required field
+            # being blank is real and worth flagging, but it should mean
+            # "this one field needs a human to fill it in", not "throw away
+            # the whole extraction". process_job now checks required-ness
+            # once against the final accumulated result (after every chunk
+            # has had a chance to fill it in) and marks just that field for
+            # manual review instead of failing the job.
 
         return True, model_output
 
@@ -720,16 +754,30 @@ class ExtractionService:
 
         doc.save(output_path)
 
-    def _store_extracted_fields(self, job: ExtractionJob, model_output: dict, document: Document) -> None:
+    def _store_extracted_fields(
+        self,
+        job: ExtractionJob,
+        model_output: dict,
+        document: Document,
+        required_missing_ids: Optional[set[str]] = None,
+    ) -> None:
+        required_missing_ids = required_missing_ids or set()
         fields = model_output.get("fields", [])
         for field in fields:
+            field_id = field.get("field_id")
             extracted = ExtractedField(
                 extraction_job_id=job.id,
-                field_id=field.get("field_id"),
+                field_id=field_id,
                 field_label=field.get("field_name"),
                 value=field.get("value"),
+                original_value=field.get("value"),
                 confidence=field.get("confidence"),
-                validation_status="pending",
+                # Required fields the model couldn't find anywhere in the
+                # document are flagged "missing" right away so they stand
+                # out in the Accept/Edit/Reject list as needing the user to
+                # type in a value by hand - everything else starts
+                # "pending" for normal review, same as before.
+                validation_status="missing" if field_id in required_missing_ids else "pending",
             )
             self.db.add(extracted)
             self.db.commit()

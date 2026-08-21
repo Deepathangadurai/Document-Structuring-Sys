@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     MODEL_NAME: str = "qwen2.5vl:7b"
     MODEL_DEVICE: str = "auto"
     MODEL_TIMEOUT_SECONDS: int = 120
+    # A single local Ollama process handling one model instance can refuse
+    # connections outright (errno 111) under too many simultaneous requests.
+    # Raise this only if Ollama is running with multiple parallel model
+    # slots (OLLAMA_NUM_PARALLEL) or on a beefier machine.
+    MODEL_MAX_CONCURRENT_REQUESTS: int = 2
     DOCUMENT_CHUNK_SIZE: int = 10
     LIBREOFFICE_PATH: str | None = None
     # Gotenberg (https://gotenberg.dev) runs LibreOffice and exposes it as

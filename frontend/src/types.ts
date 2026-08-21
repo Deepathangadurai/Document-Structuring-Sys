@@ -97,6 +97,10 @@ export interface ExtractedFieldResponse {
   field_id: string
   field_label: string
   value?: string | null
+  // Immutable snapshot of what extraction originally produced, before any
+  // edit/approve/reject. Never changes after the field is created - lets
+  // the UI offer an "Undo" back to it.
+  original_value?: string | null
   confidence?: number | null
   validation_status: string
   // Result of comparing this value to the matched template's requirement

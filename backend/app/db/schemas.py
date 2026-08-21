@@ -145,6 +145,7 @@ class ExtractedFieldResponse(BaseModel):
     field_id: str
     field_label: str
     value: Optional[str] = None
+    original_value: Optional[str] = None
     confidence: Optional[float] = None
     validation_status: str
     verification_status: Optional[str] = None

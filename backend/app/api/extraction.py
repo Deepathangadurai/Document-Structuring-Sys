@@ -141,6 +141,7 @@ def update_extracted_field(job_id: int, field_id: str, payload: FieldUpdateReque
         "field_id": field.field_id,
         "field_label": field.field_label,
         "value": field.value,
+        "original_value": field.original_value,
         "confidence": field.confidence,
         "validation_status": field.validation_status,
         "verification_status": field.verification_status,

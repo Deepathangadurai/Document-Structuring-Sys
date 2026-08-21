@@ -1,5 +1,6 @@
 import json
 import asyncio
+import time
 import httpx
 from app.services.model.base import ModelProvider
 from app.core.config import settings
@@ -14,6 +15,17 @@ class QwenVLProvider(ModelProvider):
     MAX_REFERENCE_TEXT_CHARS = 250
     MAX_PAGE_TEXT_CHARS = 800
     MAX_TOTAL_PROMPT_CHARS = 6000
+    # extract_async previously fired one concurrent request per section
+    # batch via asyncio.gather with no limit - a template with e.g. 5
+    # section batches meant 5 simultaneous POSTs at a single local Ollama
+    # process. Ollama runs one model instance and isn't built to accept a
+    # burst like that; the extra requests would get an OS-level connection
+    # refusal (errno 111) rather than being queued. Capping concurrency
+    # keeps requests within what a single local Ollama instance can
+    # actually accept at once.
+    MAX_CONCURRENT_REQUESTS = 2
+    CONNECT_RETRY_ATTEMPTS = 3
+    CONNECT_RETRY_DELAY_SECONDS = 1.5
 
     def __init__(self):
         self.provider = "qwen2.5-vl"
@@ -21,6 +33,7 @@ class QwenVLProvider(ModelProvider):
         self.device = settings.MODEL_DEVICE
         self.base_url = settings.MODEL_URL
         self.timeout = settings.MODEL_TIMEOUT_SECONDS
+        self.max_concurrent_requests = getattr(settings, "MODEL_MAX_CONCURRENT_REQUESTS", self.MAX_CONCURRENT_REQUESTS)
 
     @staticmethod
     def _truncate_text(value: str | None, max_chars: int) -> str:
@@ -153,7 +166,16 @@ class QwenVLProvider(ModelProvider):
         return prompt[: self.MAX_TOTAL_PROMPT_CHARS]
 
     async def _call_ollama_generate_async(self, client: httpx.AsyncClient, prompt: str) -> dict:
-        """Asynchronous API call reusing client session and limiting generation length."""
+        """Asynchronous API call reusing client session and limiting generation length.
+
+        Local Ollama is a single background process, not a scaled service -
+        under concurrent load (see extract_async's semaphore) or right after
+        it's just started, it can refuse a connection outright (OS-level
+        "Connection refused", errno 111) rather than queue and answer it
+        slowly. That's usually transient, so a connection refusal gets a
+        couple of short retries before it's treated as a real failure and
+        the loop moves on to try any other candidate URL.
+        """
         last_error = None
         for base_url in self._candidate_urls():
             url = f"{base_url.rstrip('/')}/api/generate"
@@ -167,18 +189,39 @@ class QwenVLProvider(ModelProvider):
                     "num_predict": 512,  # Limits runaway generation
                 },
             }
-            try:
-                response = await client.post(url, json=payload, timeout=self.timeout)
-                response.raise_for_status()
-                data = response.json()
-                self.base_url = base_url
-                return data
-            except Exception as exc:
-                last_error = exc
-                continue
+            for attempt in range(self.CONNECT_RETRY_ATTEMPTS):
+                try:
+                    response = await client.post(url, json=payload, timeout=self.timeout)
+                    response.raise_for_status()
+                    data = response.json()
+                    self.base_url = base_url
+                    return data
+                except httpx.ConnectError as exc:
+                    last_error = exc
+                    if attempt < self.CONNECT_RETRY_ATTEMPTS - 1:
+                        await asyncio.sleep(self.CONNECT_RETRY_DELAY_SECONDS * (attempt + 1))
+                        continue
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    break
         if last_error is not None:
-            raise RuntimeError(f"Ollama async request failed: {last_error}")
+            raise RuntimeError(f"Ollama async request failed: {self._describe_error(last_error)}")
         raise RuntimeError("No Ollama endpoints were reachable")
+
+    def _describe_error(self, exc: Exception) -> str:
+        """Turn a raw connection exception (often just "[Errno 111]
+        Connection refused") into something a user can act on, instead of
+        surfacing the bare OS error in extraction_service's job.error_message."""
+        if isinstance(exc, httpx.ConnectError):
+            return (
+                f"{exc} — Ollama refused the connection at {self.base_url or self._candidate_urls()[0]}. "
+                f"This usually means: (1) Ollama isn't running (`ollama serve`), "
+                f"(2) the model isn't pulled (`ollama pull {self.model_name}`), or "
+                f"(3) Ollama is overloaded by too many concurrent requests and briefly refusing new "
+                f"connections — retried automatically, but kept failing after {self.CONNECT_RETRY_ATTEMPTS} attempts."
+            )
+        return str(exc)
 
     def _call_ollama_generate(self, prompt: str) -> dict:
         last_error = None
@@ -194,18 +237,25 @@ class QwenVLProvider(ModelProvider):
                     "num_predict": 512,
                 },
             }
-            try:
-                with httpx.Client(timeout=self.timeout) as client:
-                    response = client.post(url, json=payload)
-                    response.raise_for_status()
-                    data = response.json()
-                self.base_url = base_url
-                return data
-            except Exception as exc:
-                last_error = exc
-                continue
+            for attempt in range(self.CONNECT_RETRY_ATTEMPTS):
+                try:
+                    with httpx.Client(timeout=self.timeout) as client:
+                        response = client.post(url, json=payload)
+                        response.raise_for_status()
+                        data = response.json()
+                    self.base_url = base_url
+                    return data
+                except httpx.ConnectError as exc:
+                    last_error = exc
+                    if attempt < self.CONNECT_RETRY_ATTEMPTS - 1:
+                        time.sleep(self.CONNECT_RETRY_DELAY_SECONDS * (attempt + 1))
+                        continue
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    break
         if last_error is not None:
-            raise RuntimeError(f"Ollama request failed: {last_error}")
+            raise RuntimeError(f"Ollama request failed: {self._describe_error(last_error)}")
         raise RuntimeError("No Ollama endpoints were reachable")
 
     def _section_batches(self, section: dict, max_fields: int | None = None) -> list[dict]:
@@ -239,9 +289,10 @@ class QwenVLProvider(ModelProvider):
         parsed["fields"] = filtered_fields
         return parsed
 
-    async def _extract_single_schema_async(self, client: httpx.AsyncClient, template_schema: dict, pages: list[dict]) -> dict:
+    async def _extract_single_schema_async(self, client: httpx.AsyncClient, template_schema: dict, pages: list[dict], semaphore: "asyncio.Semaphore") -> dict:
         prompt = self._build_prompt(template_schema, pages)
-        data = await self._call_ollama_generate_async(client, prompt)
+        async with semaphore:
+            data = await self._call_ollama_generate_async(client, prompt)
         raw_text = data.get("response", "")
         try:
             parsed = json.loads(raw_text)
@@ -292,7 +343,8 @@ class QwenVLProvider(ModelProvider):
                 })
 
         async with httpx.AsyncClient() as client:
-            tasks = [self._extract_single_schema_async(client, schema, pages) for schema in batch_schemas]
+            semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+            tasks = [self._extract_single_schema_async(client, schema, pages, semaphore) for schema in batch_schemas]
             results = await asyncio.gather(*tasks)
 
         combined_fields: list[dict] = []
@@ -352,7 +404,7 @@ class QwenVLProvider(ModelProvider):
                 last_error = exc
                 continue
 
-        return {"reasoning": f"Error: {last_error}", "suggestions": [], "confidence_scores": {}, "needs_review": True}
+        return {"reasoning": f"Error: {self._describe_error(last_error) if last_error else 'unknown'}", "suggestions": [], "confidence_scores": {}, "needs_review": True}
 
     def _parse_suggestions(self, response: str) -> list[dict]:
         suggestions = []

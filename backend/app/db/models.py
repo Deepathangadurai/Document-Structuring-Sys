@@ -115,6 +115,13 @@ class ExtractedField(Base):
     field_id = Column(String, nullable=False)
     field_label = Column(String, nullable=False)
     value = Column(Text, nullable=True)
+    # Immutable snapshot of the value as originally produced by extraction
+    # (deterministic rules / Qdrant / Qwen), captured once in
+    # _store_extracted_fields and never touched again. Lets the user Undo
+    # back to what the model actually found after they've edited, approved,
+    # or rejected a value - without it, an edit or rejection permanently
+    # overwrote `value` with no way back short of re-running extraction.
+    original_value = Column(Text, nullable=True)
     confidence = Column(Float, nullable=True)
     validation_status = Column(String, nullable=False, default="pending")
     # Result of "Verify Document & Template" (MATCH / MISMATCH / NOT FOUND /
