@@ -1352,7 +1352,7 @@ def _finalize_section(section: dict[str, Any]) -> None:
 
 def infer_schema_sections(source_path: Path) -> tuple[list[dict[str, Any]], str]:
     """Returns (sections, extracted_text_preview)."""
-    sections, text_preview, _, _, _, _ = infer_schema_sections_with_page_count(source_path)
+    sections, text_preview, _, _, _, _, _ = infer_schema_sections_with_page_count(source_path)
     return sections, text_preview
 
 
@@ -1583,7 +1583,29 @@ def _render_header_footer_html(container, doc: DocxDocumentType, add_field=None)
     )
 
 
-def infer_schema_sections_with_page_count(source_path: Path, output_dir: Path | None = None) -> tuple[list[dict[str, Any]], str, int, str, list[str], list[str]]:
+def _apply_static_paragraph_edit(paragraph: Paragraph, new_text: str) -> None:
+    """Overwrite a static paragraph's wording in place.
+
+    Keeps the paragraph's first run (so its font/bold/size/etc. carries
+    over) and puts the new text there; any additional runs in the same
+    paragraph are removed. This means a paragraph with more than one
+    formatting change mid-sentence collapses to a single uniform style
+    when edited - acceptable because it only affects blocks the reviewer
+    explicitly edits, never blocks left untouched.
+    """
+    runs = list(paragraph.runs)
+    if runs:
+        runs[0].text = new_text
+        for extra in runs[1:]:
+            extra._element.getparent().remove(extra._element)
+    else:
+        paragraph.add_run(new_text)
+
+
+def infer_schema_sections_with_page_count(
+    source_path: Path,
+    output_dir: Path | None = None,
+) -> tuple[list[dict[str, Any]], str, int, str, list[str], list[str], list[dict[str, Any]]]:
     """Parse a .doc/.docx into a draft schema.
 
     This is deliberately defensive throughout: a single malformed table,
@@ -1637,6 +1659,46 @@ def infer_schema_sections_with_page_count(source_path: Path, output_dir: Path | 
     page_html_fragments: dict[int, list[str]] = {}
     numbered_section_seen = False
     cover_title_count = 0
+
+    # Static content blocks: paragraphs/whole tables that carry no detected
+    # dynamic field. Reviewers can still edit this wording (it's the fixed
+    # boilerplate/labels of the master template itself), separately from
+    # the Dynamic Fields list above - collected in the same single pass so
+    # it never drifts out of sync with what was actually tagged as a field.
+    static_blocks: list[dict[str, Any]] = []
+    static_block_counter = 0
+    prev_block_was_heading = False
+
+    def _add_static_block(
+        page_num: int,
+        block_type: str,
+        text: str,
+        looks_like_blank_field: bool = False,
+        paragraph_index: int | None = None,
+    ) -> str:
+        nonlocal static_block_counter
+        static_block_counter += 1
+        block_id = f"static_{static_block_counter}"
+        static_blocks.append(
+            {
+                "block_id": block_id,
+                "page_number": page_num,
+                "block_type": block_type,
+                "text": text,
+                # Hint only - never auto-promoted. Set when a blank
+                # paragraph/table sits right after a heading or cover
+                # title, which is where "fill in later" blanks (signature
+                # lines, dates, prepared-by) usually live. The reviewer
+                # decides whether to actually promote it to a field.
+                "looks_like_blank_field": looks_like_blank_field,
+                # Stable position in doc.paragraphs used to relocate this
+                # exact paragraph later for a text edit, without having to
+                # redo the static/dynamic classification pass. None for
+                # table blocks (not editable - see apply_static_block_edits).
+                "paragraph_index": paragraph_index,
+            }
+        )
+        return block_id
 
     def _cover_title_label(text: str) -> str:
         nonlocal cover_title_count
@@ -1705,6 +1767,7 @@ def infer_schema_sections_with_page_count(source_path: Path, output_dir: Path | 
 
     total_block_count = len(list(_iter_block_items(doc)))
     table_index_counter = 0
+    paragraph_counter = 0
     for block_index, block in enumerate(_iter_block_items(doc)):
         try:
             if isinstance(block, Table):
@@ -1734,12 +1797,43 @@ def infer_schema_sections_with_page_count(source_path: Path, output_dir: Path | 
                         explicit_field_id=explicit_id,
                     )
 
+                fields_before = len(seen_field_ids)
                 _record_page_html(current_page, _render_table(block, add_field=_add_table_field))
+                table_had_fields = len(seen_field_ids) > fields_before
+                if not table_had_fields:
+                    # Whole table produced zero fields (e.g. a legend/notes
+                    # table, or one with only static labels) - offer it as
+                    # one editable static block rather than silently
+                    # locking it. Tables that DID produce at least one
+                    # field stay entirely in the Dynamic Fields list, per
+                    # the "forms and tables inside them are mostly
+                    # dynamic" review rule - we don't split a single table
+                    # across both forms.
+                    try:
+                        row_lines: list[str] = []
+                        for row in _safe_table_rows(block):
+                            try:
+                                cell_texts = [
+                                    _extract_cell_text(c).strip() for c in _safe_row_cells(row)
+                                ]
+                            except Exception:
+                                continue
+                            cell_texts = [c for c in cell_texts if c]
+                            if cell_texts:
+                                row_lines.append(" | ".join(cell_texts))
+                        table_text = "\n".join(row_lines)
+                    except Exception:
+                        table_text = ""
+                    if table_text:
+                        _add_static_block(current_page, "table", table_text)
+                prev_block_was_heading = False
                 continue
 
             paragraph = block
             raw_text = paragraph.text
             text = raw_text.strip()
+            this_paragraph_index = paragraph_counter
+            paragraph_counter += 1
 
             if have_real_pages:
                 if text:
@@ -1790,7 +1884,26 @@ def infer_schema_sections_with_page_count(source_path: Path, output_dir: Path | 
             _record_page_html(current_page, _render_paragraph(paragraph, field_id=field_id, value_start=value_start))
 
             if not text:
+                # A blank line right after a heading/cover title is often a
+                # "fill in later" spot (signature, date, prepared-by) that
+                # never matched a "Label: value" pattern because there's no
+                # text there at all to match against - surface it as a
+                # promotable static block instead of silently dropping it,
+                # so it's at least visible and one click away from being
+                # turned into a real dynamic field during review.
+                if prev_block_was_heading:
+                    _add_static_block(
+                        current_page, "paragraph", "", looks_like_blank_field=True,
+                        paragraph_index=this_paragraph_index,
+                    )
+                prev_block_was_heading = False
                 continue
+            if field_id is None:
+                _add_static_block(
+                    current_page, "heading" if is_heading else "paragraph", text,
+                    paragraph_index=this_paragraph_index,
+                )
+            prev_block_was_heading = is_heading
             if is_numbered_heading:
                 numbered_section_seen = True
             if is_heading and not is_cover_title:
@@ -1922,7 +2035,43 @@ def infer_schema_sections_with_page_count(source_path: Path, output_dir: Path | 
         for p in sorted(overflow_pages):
             page_html[-1] += "".join(page_html_fragments[p])
 
-    return sections, text_preview, page_count, preview_html, page_images, page_html
+    return sections, text_preview, page_count, preview_html, page_images, page_html, static_blocks
+
+
+def apply_static_block_edits(
+    source_path: Path,
+    edits: list[dict[str, Any]],
+) -> list[str]:
+    """Write edited static-block wording directly into the master/pending
+    .docx, in place, by paragraph position - deliberately NOT a re-run of
+    infer_schema_sections_with_page_count(), so it can never regenerate
+    (and thereby discard) sections a reviewer already hand-edited.
+
+    `edits` is a list of {"block_id", "paragraph_index", "text"} - the
+    paragraph_index values must come from the static_blocks this same
+    document previously produced. Table-type static blocks have no
+    paragraph_index and are silently skipped (whole-table wording isn't
+    safe to rewrite from a single flattened text blob without risking the
+    "tables keep their exact structure" requirement - that needs a
+    cell-by-cell editor, not this).
+
+    Returns the list of block_ids actually written, so the caller can
+    tell which requested edits were applied vs skipped.
+    """
+    doc = docx.Document(str(source_path))
+    paragraphs = doc.paragraphs
+    applied: list[str] = []
+    for edit in edits:
+        idx = edit.get("paragraph_index")
+        block_id = edit.get("block_id")
+        new_text = edit.get("text", "")
+        if idx is None or not isinstance(idx, int) or idx < 0 or idx >= len(paragraphs):
+            continue
+        _apply_static_paragraph_edit(paragraphs[idx], new_text)
+        applied.append(block_id)
+    if applied:
+        doc.save(str(source_path))
+    return applied
 
 
 def _clean_extracted_text(value: str | None) -> str:

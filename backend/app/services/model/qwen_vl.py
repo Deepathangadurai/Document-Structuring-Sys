@@ -11,10 +11,10 @@ class QwenVLProvider(ModelProvider):
     """
 
     # OPTIMIZATION: Increased batch size from 2 to 8 fields to reduce API round-trips.
-    MAX_FIELDS_PER_PROMPT = 8
+    MAX_FIELDS_PER_PROMPT = 12
     MAX_REFERENCE_TEXT_CHARS = 250
-    MAX_PAGE_TEXT_CHARS = 800
-    MAX_TOTAL_PROMPT_CHARS = 6000
+    MAX_PAGE_TEXT_CHARS = 2000
+    MAX_TOTAL_PROMPT_CHARS = 12000
     # extract_async previously fired one concurrent request per section
     # batch via asyncio.gather with no limit - a template with e.g. 5
     # section batches meant 5 simultaneous POSTs at a single local Ollama
@@ -186,7 +186,7 @@ class QwenVLProvider(ModelProvider):
                 "stream": False,
                 "options": {
                     "temperature": 0,
-                    "num_predict": 512,  # Limits runaway generation
+                    "num_predict": 1024,  # Enough for all fields to complete
                 },
             }
             for attempt in range(self.CONNECT_RETRY_ATTEMPTS):
@@ -234,7 +234,7 @@ class QwenVLProvider(ModelProvider):
                 "stream": False,
                 "options": {
                     "temperature": 0,
-                    "num_predict": 512,
+                    "num_predict": 1024,
                 },
             }
             for attempt in range(self.CONNECT_RETRY_ATTEMPTS):

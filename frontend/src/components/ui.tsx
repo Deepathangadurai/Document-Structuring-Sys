@@ -15,6 +15,7 @@ type BadgeType =
   | 'missing'
   | 'review'
   | 'rejected'
+  | 'secondary'
 
 // Status colors follow the AmperePro Design System (DESIGN_SYSTEM.md §7)
 const BADGE_STYLES: Record<BadgeType, string> = {
@@ -32,6 +33,7 @@ const BADGE_STYLES: Record<BadgeType, string> = {
   missing: 'bg-danger-light text-danger border-danger/20',
   review: 'bg-review-light text-review border-review/20',
   rejected: 'bg-danger-light text-danger border-danger/20 line-through',
+  secondary: 'bg-slate-100 text-slate-500 border-slate-200',
 }
 
 export function Badge({ children, type, title }: { children: React.ReactNode; type: string; title?: string }) {

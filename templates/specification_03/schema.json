@@ -1,10 +1,10 @@
 {
-  "template_id": "specification_01",
-  "template_name": "ELECTRICAL DESIGN BASIS",
+  "template_id": "specification_03",
+  "template_name": "SPECIFICATION FOR M.V. SWITCH BOARD",
   "version": "1.0",
-  "specification_number": "IP009-43-00-01-0",
-  "description": "Master template definition for Specification 01.",
-  "file_name": "IP009-43-00-01-0.doc",
+  "specification_number": "IP007-43-03-02-0",
+  "description": "Master template definition for Specification 03 - M.V. Switch Board (11kV Switch Board #01), Pashmina Project, Momentive Performance Materials, Chennai. Revision 0. NOTE: the uploaded file is named IP009-43-03-02-0.doc, but every SPEC. NO./PROJECT NO. field printed inside the document itself reads IP007-43-03-02 / IP-007, not IP009 - this mismatch is in the source document, not introduced here. Flagged for the reviewer to confirm which is correct before approving.",
+  "file_name": "IP009-43-03-02-0.doc",
   "structure_locked": true,
   "sections": [
     {
@@ -12,19 +12,66 @@
       "section_name": "General",
       "fields": [
         {
+          "field_id": "spec_no",
+          "field_label": "Spec. No.",
+          "data_type": "string",
+          "required": true,
+          "extraction_hint": "Extract the specification number from the cover/header table, e.g. \"IP007-43-03-02\".",
+          "default_value": "IP007-43-03-02",
+          "validation_rules": []
+        },
+        {
+          "field_id": "revision",
+          "field_label": "Revision",
+          "data_type": "string",
+          "required": true,
+          "extraction_hint": "Extract the revision letter/number from the cover/header table, e.g. \"REV. 0\".",
+          "default_value": "0",
+          "validation_rules": []
+        },
+        {
+          "field_id": "project_no",
+          "field_label": "Project No.",
+          "data_type": "string",
+          "required": true,
+          "extraction_hint": "Extract the project number from the cover/header table.",
+          "default_value": "IP-007",
+          "validation_rules": []
+        },
+        {
           "field_id": "project_name",
           "field_label": "Project Name",
           "data_type": "string",
           "required": true,
-          "extraction_hint": "Extract the project name from the source document.",
+          "extraction_hint": "Extract the project name from the cover page.",
+          "default_value": "PASHMINA PROJECT",
           "validation_rules": []
         },
         {
-          "field_id": "project_number",
-          "field_label": "Project Number",
+          "field_id": "description",
+          "field_label": "Description",
+          "data_type": "string",
+          "required": true,
+          "extraction_hint": "Extract the equipment description from the cover/header table.",
+          "default_value": "M.V. SWITCH BOARD",
+          "validation_rules": []
+        },
+        {
+          "field_id": "client_name",
+          "field_label": "Client Name",
           "data_type": "string",
           "required": false,
-          "extraction_hint": "Extract the project number if available.",
+          "extraction_hint": "Extract the client/owner company name from the cover page.",
+          "default_value": "MOMENTIVE PERFORMANCE MATERIALS",
+          "validation_rules": []
+        },
+        {
+          "field_id": "location",
+          "field_label": "Location",
+          "data_type": "string",
+          "required": false,
+          "extraction_hint": "Extract the project location/city from the cover page.",
+          "default_value": "CHENNAI",
           "validation_rules": []
         }
       ]

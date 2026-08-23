@@ -22,6 +22,17 @@ export interface DocumentSection {
   paragraphs: unknown[]
 }
 
+export interface StaticBlock {
+  block_id: string
+  page_number: number
+  block_type: 'paragraph' | 'heading' | 'table'
+  text: string
+  looks_like_blank_field: boolean
+  // Only present for paragraph/heading blocks - identifies exactly which
+  // paragraph an edit gets written back into. Table blocks are read-only.
+  paragraph_index?: number | null
+}
+
 export interface TemplateListResponse {
   template_id: string
   template_name: string
@@ -37,6 +48,7 @@ export interface TemplateListResponse {
   // Per-page HTML rendered directly from the .docx, independent of
   // LibreOffice/soffice. Used as a fallback when page_images[i] is missing.
   page_html?: string[]
+  static_blocks?: StaticBlock[]
 }
 
 export interface PendingTemplateResponse extends TemplateListResponse {
@@ -51,6 +63,7 @@ export interface PendingTemplateUpdateRequest {
   description?: string | null
   specification_number?: string | null
   sections?: TemplateSection[]
+  static_blocks?: StaticBlock[]
 }
 
 export interface ProjectResponse {
@@ -160,6 +173,7 @@ export interface FieldVerificationResponse {
   status: VerificationStatus
   expected_hint?: string | null
   reason?: string | null
+  required?: boolean
 }
 
 export interface CreateExtractionRequest {

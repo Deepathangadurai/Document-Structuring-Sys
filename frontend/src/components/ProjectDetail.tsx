@@ -147,7 +147,7 @@ export default function ProjectDetail() {
     if (Object.keys(edits).length > 0) {
       const ok = window.confirm(
         `You have ${Object.keys(edits).length} unsaved edit(s) on this specification. ` +
-          `Switching will discard them unless you Approve or Save them first. Continue anyway?`,
+        `Switching will discard them unless you Approve or Save them first. Continue anyway?`,
       )
       if (!ok) return
     }
@@ -197,6 +197,37 @@ export default function ProjectDetail() {
   }, [jobForSelectedDocument, activePage])
 
   const extractedFields = jobForSelectedDocument?.extracted_fields ?? []
+  // Static fields (is_dynamic === false) are template defaults the schema
+  // explicitly allows overriding (see backend _seed_static_fields) - shown
+  // in their own panel so they're editable even if the document preview's
+  // auto-detected field spans don't happen to tag their placeholder.
+  const staticFields = useMemo(
+    () => extractedFields.filter((f) => f.is_dynamic === false),
+    [extractedFields],
+  )
+  const [savingStaticId, setSavingStaticId] = useState<string | null>(null)
+
+  async function handleSaveStatic(field: ExtractedFieldResponse) {
+    if (!jobForSelectedDocument) return
+    const value = edits[field.field_id] ?? getFieldDisplayValue(field)
+    setSavingStaticId(field.field_id)
+    try {
+      await updateExtractedField(jobForSelectedDocument.id, field.field_id, {
+        value,
+        validation_status: 'verified',
+      })
+      setEdits((prev) => {
+        const next = { ...prev }
+        delete next[field.field_id]
+        return next
+      })
+      await loadProject()
+    } catch (err) {
+      setError(`Could not save static field: ${(err as Error).message}`)
+    } finally {
+      setSavingStaticId(null)
+    }
+  }
   const extractedByFieldId = useMemo(() => {
     const map: { [fieldId: string]: ExtractedFieldResponse } = {}
     for (const f of extractedFields) map[f.field_id] = f
@@ -226,7 +257,7 @@ export default function ProjectDetail() {
     } catch (err) {
       setVerifyError(
         `Verification is not available yet: ${(err as Error).message}. This calls a new backend endpoint ` +
-          `(GET /extraction/{jobId}/verify) that still needs to compare extracted values against the matched template's requirements.`,
+        `(GET /extraction/{jobId}/verify) that still needs to compare extracted values against the matched template's requirements.`,
       )
     } finally {
       setVerifying(false)
@@ -274,7 +305,7 @@ export default function ProjectDetail() {
         setEdits((prev) => (prev[fieldId] === text ? prev : { ...prev, [fieldId]: text }))
       }
       span.removeEventListener('input', (span as any).__fieldInputHandler)
-      ;(span as any).__fieldInputHandler = handler
+        ; (span as any).__fieldInputHandler = handler
       span.addEventListener('input', handler)
     })
   }, [edits, extractedByFieldId])
@@ -403,6 +434,32 @@ export default function ProjectDetail() {
     }
   }
 
+  // "GENERATE SEPARATE DOCUMENTS ... DOWNLOAD Separate Documents" from the
+  // original workflow: every detected specification is its own extraction
+  // job and its own file, on purpose (never a zip) - but until now there
+  // was no way to get all of them without clicking into each specification
+  // one at a time. Download-all just fires the existing single-file export
+  // per completed job, staggered slightly so the browser doesn't treat
+  // several near-simultaneous downloads as popup spam and block them.
+  const completedJobCount = project?.extraction_jobs.filter((j) => j.status === 'completed').length ?? 0
+
+  async function handleDownloadAll() {
+    if (!project) return
+    const completed = project.extraction_jobs.filter((j) => j.status === 'completed')
+    for (let i = 0; i < completed.length; i++) {
+      const job = completed[i]
+      const link = document.createElement('a')
+      link.href = getExtractionExportUrl(job.id, 'docx')
+      link.download = ''
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      if (i < completed.length - 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 400))
+      }
+    }
+  }
+
   if (loading && !project) {
     return <div className="p-8 max-w-6xl mx-auto text-sm text-slate-500">Loading project…</div>
   }
@@ -420,7 +477,7 @@ export default function ProjectDetail() {
   const totalPages = pagePreview?.total_pages || 1
 
   return (
-    <div className="p-8 max-w-7xl mx-auto pb-20">
+    <div className="p-8 max-w-7xl mx-auto overflow-y-auto h-full pb-20">
       <div className="mb-6 flex items-center justify-between">
         <Button variant="ghost" onClick={() => navigate('/projects')}>
           <Icons.ChevronLeft className="w-4 h-4 mr-1" /> Back to Projects
@@ -436,7 +493,15 @@ export default function ProjectDetail() {
               detected from this project's source document
             </p>
           </div>
-          <Badge type={project.status}>{project.status}</Badge>
+          <div className="flex items-center gap-3">
+            {completedJobCount > 0 ? (
+              <Button variant="secondary" onClick={() => void handleDownloadAll()}>
+                <Icons.Download className="w-4 h-4" />
+                Download All ({completedJobCount})
+              </Button>
+            ) : null}
+            <Badge type={project.status}>{project.status}</Badge>
+          </div>
         </div>
       </div>
 
@@ -463,9 +528,8 @@ export default function ProjectDetail() {
                     <li key={job.id}>
                       <button
                         onClick={() => selectJob(job.id)}
-                        className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${
-                          selectedJobId === job.id ? 'bg-brand-light' : ''
-                        }`}
+                        className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${selectedJobId === job.id ? 'bg-brand-light' : ''
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium text-slate-900 truncate">
@@ -545,6 +609,52 @@ export default function ProjectDetail() {
               ) : null}
             </Card>
 
+            {/* Static fields - template defaults the schema explicitly
+                allows a human to override. Locked-by-default content with
+                no default_value in schema never appears here at all. */}
+            {staticFields.length > 0 ? (
+              <Card className="p-4">
+                <h3 className="font-semibold mb-1 text-sm">Static Fields</h3>
+                <p className="text-xs text-slate-500 mb-3">
+                  Template defaults. Locked unless you change them here.
+                </p>
+                <div className="space-y-3">
+                  {staticFields.map((field) => {
+                    const currentValue = edits[field.field_id] ?? getFieldDisplayValue(field)
+                    const isDirty = currentValue !== getFieldDisplayValue(field)
+                    return (
+                      <div key={field.field_id}>
+                        <label className="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+                          {field.field_label}
+                          <Badge type="secondary">
+                            <span className="text-[10px]">🔒 static</span>
+                          </Badge>
+                        </label>
+                        <div className="flex gap-2 mt-1">
+                          <input
+                            type="text"
+                            className="flex-1 text-sm border border-slate-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand"
+                            value={currentValue}
+                            onChange={(e) =>
+                              setEdits((prev) => ({ ...prev, [field.field_id]: e.target.value }))
+                            }
+                          />
+                          <Button
+                            variant="secondary"
+                            className="!px-3 !py-1.5 !text-xs shrink-0"
+                            disabled={!isDirty || savingStaticId === field.field_id}
+                            onClick={() => void handleSaveStatic(field)}
+                          >
+                            {savingStaticId === field.field_id ? 'Saving…' : 'Save'}
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
+            ) : null}
+
             {/* Field checklist - navigation + approve/reject only. Editing
                 the value itself only ever happens in the document pane;
                 nothing here is a text input. */}
@@ -581,7 +691,7 @@ export default function ProjectDetail() {
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Badge type={field.validation_status}>{field.validation_status}</Badge>
                           {edits[field.field_id] !== undefined &&
-                          edits[field.field_id] !== getFieldDisplayValue(field) ? (
+                            edits[field.field_id] !== getFieldDisplayValue(field) ? (
                             <span
                               className="text-[10px] font-medium text-amber-600"
                               title="Typed in the document but not yet saved, approved, or rejected"
@@ -599,8 +709,8 @@ export default function ProjectDetail() {
                           ) : null}
                           <div className="flex-1" />
                           {field.original_value !== undefined &&
-                          field.original_value !== null &&
-                          (currentValue !== field.original_value || field.validation_status !== 'pending') ? (
+                            field.original_value !== null &&
+                            (currentValue !== field.original_value || field.validation_status !== 'pending') ? (
                             <button
                               disabled={isSaving}
                               onClick={() => void handleUndo(field)}

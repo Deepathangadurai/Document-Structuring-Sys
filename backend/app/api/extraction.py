@@ -145,6 +145,7 @@ def update_extracted_field(job_id: int, field_id: str, payload: FieldUpdateReque
         "confidence": field.confidence,
         "validation_status": field.validation_status,
         "verification_status": field.verification_status,
+        "is_dynamic": field.is_dynamic,
         "source_references": [
             {
                 "page_number": source.page_number,

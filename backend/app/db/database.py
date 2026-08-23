@@ -38,6 +38,7 @@ def run_startup_migrations(bind_engine=None) -> None:
 
     target_engine = bind_engine or engine
     inspector = inspect(target_engine)
+    assert inspector is not None  # inspect(Engine) always returns an Inspector
     if "templates" not in inspector.get_table_names():
         return  # table will be created fresh by create_all with the new columns
 
@@ -48,7 +49,7 @@ def run_startup_migrations(bind_engine=None) -> None:
     if "source_filename" not in existing_columns:
         statements.append("ALTER TABLE templates ADD COLUMN source_filename VARCHAR")
     if "structure_locked" not in existing_columns:
-        statements.append("ALTER TABLE templates ADD COLUMN structure_locked BOOLEAN NOT NULL DEFAULT 0")
+        statements.append("ALTER TABLE templates ADD COLUMN structure_locked BOOLEAN NOT NULL DEFAULT FALSE")
     if "structure_signature" not in existing_columns:
         statements.append("ALTER TABLE templates ADD COLUMN structure_signature JSON")
 
@@ -75,6 +76,11 @@ def run_startup_migrations(bind_engine=None) -> None:
             # for those older rows.
             statements.append("ALTER TABLE extracted_fields ADD COLUMN original_value TEXT")
             statements.append("UPDATE extracted_fields SET original_value = value WHERE original_value IS NULL")
+        if "is_dynamic" not in field_columns:
+            # Existing rows all came from extraction (the only source before
+            # this column existed), so backfilling them as dynamic=true is
+            # correct - static rows are a new concept only created from now on.
+            statements.append("ALTER TABLE extracted_fields ADD COLUMN is_dynamic BOOLEAN NOT NULL DEFAULT TRUE")
 
     if not statements:
         return

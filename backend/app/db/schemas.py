@@ -34,6 +34,23 @@ class DocumentSection(BaseModel):
     class Config:
         from_attributes = True
 
+class StaticBlock(BaseModel):
+    """A paragraph/heading/table with no detected dynamic field - fixed
+    wording that's part of the master template itself. Still editable (to
+    fix the master template's own text), separately from field values."""
+    block_id: str
+    page_number: int
+    block_type: str  # 'paragraph' | 'heading' | 'table'
+    text: str
+    looks_like_blank_field: bool = False
+    # Present only for block_type == 'paragraph'/'heading'; identifies the
+    # exact paragraph in doc.paragraphs so an edit can be written back
+    # in place. None for 'table' blocks, which are read-only for now.
+    paragraph_index: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
 class TemplateListResponse(BaseModel):
     template_id: str
     template_name: str
@@ -50,17 +67,16 @@ class TemplateListResponse(BaseModel):
     # LibreOffice/soffice dependency). Used by the page review UI when
     # page_images[i] is missing or soffice conversion failed.
     page_html: List[str] = Field(default_factory=list)
+    static_blocks: List[StaticBlock] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
 
 class TemplatePreviewResponse(TemplateListResponse):
-    class Config:
-        from_attributes = True
+    pass
 
 class TemplateDetailResponse(TemplatePreviewResponse):
-    class Config:
-        from_attributes = True
+    pass
 
 class PendingTemplateResponse(TemplateListResponse):
     id: int
@@ -70,14 +86,14 @@ class PendingTemplateResponse(TemplateListResponse):
     structure_locked: bool = False
     document_sections: List[DocumentSection] = Field(default_factory=list)
 
-    class Config:
-        from_attributes = True
+
 
 class PendingTemplateUpdateRequest(BaseModel):
     template_name: Optional[str] = None
     description: Optional[str] = None
     specification_number: Optional[str] = None
     sections: Optional[List[TemplateSection]] = None
+    static_blocks: Optional[List[StaticBlock]] = None
 
 class CreateProjectRequest(BaseModel):
     project_name: str
@@ -107,8 +123,7 @@ class ProjectDetailResponse(ProjectResponse):
     documents: List[Any] = Field(default_factory=list)
     extraction_jobs: List[Any] = Field(default_factory=list)
 
-    class Config:
-        from_attributes = True
+
 
 class DocumentMetadataResponse(BaseModel):
     id: int
@@ -193,6 +208,11 @@ class FieldVerificationResponse(BaseModel):
     status: str
     expected_hint: Optional[str] = None
     reason: Optional[str] = None
+    # Whether the template schema marks this field as required. Surfaced so
+    # the frontend's manual-entry form can prioritize and flag required
+    # NOT_FOUND fields distinctly from optional ones, without re-deriving
+    # it from `reason` text.
+    required: bool = False
 
 class ModelHealthResponse(BaseModel):
     available: bool

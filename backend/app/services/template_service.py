@@ -7,7 +7,11 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 from app.db.models import Template
 from app.core.config import settings
-from app.services.schema_inference import infer_schema_sections_with_page_count, get_document_sections_for_display
+from app.services.schema_inference import (
+    infer_schema_sections_with_page_count,
+    get_document_sections_for_display,
+    apply_static_block_edits,
+)
 
 # Process-wide cache so we don't re-read every schema.json and hit the DB
 # on every single /templates request. Templates change rarely (deploy-time),
@@ -169,7 +173,7 @@ class TemplateService:
                 merged_schema = {**existing_schema, **schema}
                 for computed_key in (
                     "page_html", "page_images", "preview_html",
-                    "document_sections", "text_preview",
+                    "document_sections", "text_preview", "static_blocks",
                 ):
                     if not schema.get(computed_key) and existing_schema.get(computed_key):
                         merged_schema[computed_key] = existing_schema[computed_key]
@@ -196,10 +200,11 @@ class TemplateService:
                 page_images: list[str] = schema.get("page_images", []) or []
                 page_html: list[str] = schema.get("page_html", []) or []
                 document_sections = schema.get("document_sections", [])
+                static_blocks: list[dict] = schema.get("static_blocks", []) or []
                 if source_path is not None:
                     try:
                         images_output_dir = self.pending_storage_path / f"{template_id}" / "pages"
-                        sections, text_preview, page_count, preview_html, page_images, page_html = infer_schema_sections_with_page_count(
+                        sections, text_preview, page_count, preview_html, page_images, page_html, static_blocks = infer_schema_sections_with_page_count(
                             source_path, images_output_dir
                         )
                         document_sections = get_document_sections_for_display(source_path)
@@ -214,6 +219,7 @@ class TemplateService:
                 pending_schema["page_images"] = self._to_static_urls(page_images)
                 pending_schema["page_html"] = page_html
                 pending_schema["document_sections"] = document_sections
+                pending_schema["static_blocks"] = static_blocks
 
                 template = Template(
                     template_id=template_id,
@@ -282,6 +288,7 @@ class TemplateService:
             # instead of showing a broken preview.
             "page_html": schema_data.get("page_html", []),
             "document_sections": schema_data.get("document_sections", []),
+            "static_blocks": schema_data.get("static_blocks", []),
         }
 
     # ------------------------------------------------------------------
@@ -325,8 +332,8 @@ class TemplateService:
             # Create directory for page images
             images_output_dir = self.pending_storage_path / stored_filename.replace('.doc', '').replace('.docx', '') / 'pages'
             print(f"[template_service] create_pending_template: parsing {destination} (images -> {images_output_dir})", flush=True)
-            sections, text_preview, page_count, preview_html, page_images, page_html = infer_schema_sections_with_page_count(destination, images_output_dir)
-            print(f"[template_service] create_pending_template: parsed OK - {page_count} pages, {len(page_images)} page images, {len(page_html)} page html chunks, {len(sections)} sections", flush=True)
+            sections, text_preview, page_count, preview_html, page_images, page_html, static_blocks = infer_schema_sections_with_page_count(destination, images_output_dir)
+            print(f"[template_service] create_pending_template: parsed OK - {page_count} pages, {len(page_images)} page images, {len(page_html)} page html chunks, {len(sections)} sections, {len(static_blocks)} static blocks", flush=True)
             document_sections = get_document_sections_for_display(destination)
         except Exception as exc:
             print(f"[template_service] create_pending_template: FAILED to parse {destination}: {exc!r}", flush=True)
@@ -355,6 +362,7 @@ class TemplateService:
                 "document_sections": document_sections,
                 "page_images": self._to_static_urls(page_images),
                 "page_html": page_html,
+                "static_blocks": static_blocks,
             },
             is_active=False,
             status="pending",
@@ -394,6 +402,77 @@ class TemplateService:
             setattr(template, "specification_number", updates["specification_number"])
         if "sections" in updates and updates["sections"] is not None:
             schema_data["sections"] = updates["sections"]
+
+        if "static_blocks" in updates and updates["static_blocks"] is not None:
+            incoming_blocks = updates["static_blocks"]
+            existing_blocks = schema_data.get("static_blocks", []) or []
+            existing_by_id = {b.get("block_id"): b for b in existing_blocks if b.get("block_id")}
+
+            # Only paragraph-type blocks whose text actually changed get
+            # written into the .docx - table blocks are view-only (see
+            # apply_static_block_edits), and unchanged blocks are left
+            # alone so we never touch a paragraph the reviewer didn't ask
+            # to edit.
+            to_write = []
+            for incoming in incoming_blocks:
+                block_id = incoming.get("block_id")
+                original = existing_by_id.get(block_id)
+                if not original or original.get("block_type") == "table":
+                    continue
+                if incoming.get("text", "") == original.get("text", ""):
+                    continue
+                to_write.append(
+                    {
+                        "block_id": block_id,
+                        "paragraph_index": original.get("paragraph_index"),
+                        "text": incoming.get("text", ""),
+                    }
+                )
+
+            stored_filename = cast(str, getattr(template, "file_name"))
+            if to_write and stored_filename:
+                doc_path = self.pending_storage_path / stored_filename
+                if doc_path.exists():
+                    applied_ids = apply_static_block_edits(doc_path, to_write)
+                    applied_text = {e["block_id"]: e["text"] for e in to_write if e["block_id"] in applied_ids}
+                    for block in existing_blocks:
+                        if block.get("block_id") in applied_text:
+                            block["text"] = applied_text[block["block_id"]]
+
+                    if applied_ids:
+                        # The .docx text changed - refresh the rendered
+                        # preview byproducts (page_html/page_images/etc.)
+                        # from the now-edited file, but only those. Never
+                        # let this refresh overwrite `sections` or
+                        # `static_blocks`, since both may already carry
+                        # edits (renamed fields, removed blocks from a
+                        # "promote to dynamic" action) that a fresh
+                        # re-parse would otherwise discard - same
+                        # selective-merge principle sync_templates() uses.
+                        try:
+                            images_output_dir = self.pending_storage_path / stored_filename.replace('.doc', '').replace('.docx', '') / 'pages'
+                            _, refreshed_preview, refreshed_count, refreshed_html, refreshed_images, refreshed_page_html, _ = infer_schema_sections_with_page_count(
+                                doc_path, images_output_dir
+                            )
+                            schema_data["text_preview"] = refreshed_preview
+                            schema_data["page_count"] = refreshed_count
+                            schema_data["preview_html"] = refreshed_html
+                            schema_data["page_images"] = self._to_static_urls(refreshed_images)
+                            schema_data["page_html"] = refreshed_page_html
+                        except Exception:
+                            pass  # keep the previous preview rather than fail the whole save
+
+            # The incoming list is the frontend's full current set (edits
+            # AND removals from "promote to dynamic field") - persist it
+            # as-is so a promoted block no longer shows up as static next
+            # load. Any table-block text edits sent alongside are dropped
+            # here (never applied above), so they can't silently diverge
+            # from what's actually in the .docx.
+            for incoming in incoming_blocks:
+                original = existing_by_id.get(incoming.get("block_id"))
+                if original and original.get("block_type") == "table":
+                    incoming["text"] = original.get("text", "")
+            schema_data["static_blocks"] = incoming_blocks
 
         setattr(template, "schema", schema_data)
         self.db.add(template)

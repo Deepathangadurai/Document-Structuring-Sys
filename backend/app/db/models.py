@@ -129,6 +129,15 @@ class ExtractedField(Base):
     # accept/edit/reject workflow - this tracks the automated comparison
     # against what the matched master template requires.
     verification_status = Column(String, nullable=True)
+    # True for fields the model extracted from the source document (the
+    # original/only case). False for STATIC template fields the user is
+    # allowed to manually override (schema field has is_dynamic: false but
+    # declares a default_value) - these rows are seeded once at job
+    # creation (see extraction_service._seed_static_fields), not produced
+    # by extraction, and never show a confidence score or source reference.
+    # Static schema fields with no default_value are never seeded here at
+    # all, so they stay genuinely locked with no editable row anywhere.
+    is_dynamic = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     extraction_job = relationship("ExtractionJob", back_populates="extracted_fields")

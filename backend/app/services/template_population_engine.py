@@ -20,15 +20,11 @@ Workflow:
       ↓
   Output Document (100% Structurally Identical)
 """
-import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from docx import Document as DocxDocument
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-from docx.shared import RGBColor, Pt
-from docx.text.paragraph import Paragraph
+from docx.text.paragraph import Paragraph  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
 
@@ -181,15 +177,26 @@ class TemplatePopulationEngine:
         return True, report
     
     def _extract_dynamic_fields(self) -> dict[str, dict[str, Any]]:
-        """Extract fields marked as dynamic from schema."""
+        """Fields whose placeholder in the master template is allowed to be
+        replaced: fields marked `is_dynamic: true` (normal extraction
+        output), PLUS static fields that declare a `default_value` - those
+        are the ones extraction_service._seed_static_fields() creates an
+        editable row for, so a user override on one of them needs to reach
+        the actual document, not just sit in the database. Static fields
+        with no default_value are never included here, so they stay
+        genuinely immutable - nothing in extracted_values could match them
+        anyway since no row is ever seeded for them.
+        """
         dynamic_fields = {}
         
         sections = self.schema.get("sections", [])
         for section in sections:
             fields = section.get("fields", [])
             for field in fields:
-                # Only include fields explicitly marked as dynamic
-                if field.get("is_dynamic", False):
+                is_overridable_static = (
+                    not field.get("is_dynamic", False) and field.get("default_value") is not None
+                )
+                if field.get("is_dynamic", False) or is_overridable_static:
                     field_id = field.get("field_id", "")
                     if field_id:
                         dynamic_fields[field_id] = field
@@ -326,8 +333,10 @@ class TemplatePopulationEngine:
             italic = getattr(original_run, "italic", False)
 
             # Clear all runs
-            for run in paragraph.runs:
-                run._element.getparent().remove(run._element)
+            for run in list(paragraph.runs):
+                parent = run._element.getparent()
+                if parent is not None:
+                    parent.remove(run._element)
 
             # Add new run with original formatting
             new_run = paragraph.add_run(new_text)

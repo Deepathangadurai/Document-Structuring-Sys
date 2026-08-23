@@ -10,8 +10,8 @@ immutability principle.
 """
 import logging
 from pathlib import Path
-from typing import Any, Optional
-from docx import Document as DocxDocument
+from typing import Any
+from docx import Document as DocxDocument  # type: ignore[import-not-found]
 from app.services.template_structure_analyzer import (
     TemplateStructureAnalyzer,
     DocumentStructureSignature,

@@ -321,6 +321,7 @@ class ExtractionService:
                     "confidence": extracted.confidence,
                     "validation_status": extracted.validation_status,
                     "verification_status": extracted.verification_status,
+                    "is_dynamic": extracted.is_dynamic,
                     "source_references": sources,
                 }
             )
@@ -419,7 +420,7 @@ class ExtractionService:
             job.progress = int(chunk_index / total_chunks * 100)  # type: ignore[assignment]
             job.status = "processing"  # type: ignore[assignment]
             self.db.add(job)
-            self.db.commit()
+            self.db.commit()  # must commit so polling endpoint sees progress updates
 
             try:
                 model_output = model_service.extract(
@@ -454,7 +455,7 @@ class ExtractionService:
                 elif existing.get("value") is None and field.get("source") is None and field.get("source"):
                     accumulated_fields[field_id]["source"] = field.get("source")
 
-            time.sleep(0.5)
+            self.db.commit()  # hard commit after each successful model call
 
         final_output = {
             "template_id": schema_dict.get("template_id"),
@@ -469,6 +470,7 @@ class ExtractionService:
         # everything else that WAS found is stored and usable regardless.
         required_missing_ids = self._required_missing_field_ids(final_output, schema_dict)
         self._store_extracted_fields(job, final_output, document, required_missing_ids)
+        self._seed_static_fields(job, template)
 
         job.progress = 100  # type: ignore[assignment]
         job.current_page = job.total_pages  # type: ignore[assignment]
@@ -778,6 +780,7 @@ class ExtractionService:
                 # type in a value by hand - everything else starts
                 # "pending" for normal review, same as before.
                 validation_status="missing" if field_id in required_missing_ids else "pending",
+                is_dynamic=True,
             )
             self.db.add(extracted)
             self.db.commit()
@@ -792,4 +795,57 @@ class ExtractionService:
                 bounding_box=source.get("bounding_box"),
             )
             self.db.add(reference)
+        self.db.commit()
+
+    def _seed_static_fields(self, job: ExtractionJob, template: Template) -> None:
+        """Give the user something to actually edit for STATIC fields.
+
+        Extraction only ever produces rows for dynamic fields (see
+        _store_extracted_fields) - static content had no ExtractedField row
+        at all, so the workspace had no way to show it, let alone let the
+        user override it, even though the original workflow explicitly
+        calls for "Static Content: locked by default, user can override".
+
+        Only fields the schema marks `is_dynamic: false` AND that declare a
+        `default_value` are seeded here. A static field with no
+        default_value is intentionally left with no row at all - it stays
+        genuinely locked, exactly as before, with nothing to accidentally
+        blank out. is_dynamic=False on the row is what tells the workspace
+        UI and the population engine this came from the template default,
+        not from extraction.
+        """
+        schema = getattr(template, "schema") or {}
+        sections = schema.get("sections", [])
+        for section in sections:
+            for field in section.get("fields", []):
+                if field.get("is_dynamic", False):
+                    continue
+                default_value = field.get("default_value")
+                if default_value is None:
+                    continue
+                field_id = field.get("field_id")
+                if not field_id:
+                    continue
+                already_seeded = (
+                    self.db.query(ExtractedField)
+                    .filter_by(extraction_job_id=job.id, field_id=field_id)
+                    .first()
+                )
+                if already_seeded:
+                    continue
+                self.db.add(
+                    ExtractedField(
+                        extraction_job_id=job.id,
+                        field_id=field_id,
+                        field_label=field.get("field_label", field_id),
+                        value=str(default_value),
+                        original_value=str(default_value),
+                        confidence=None,
+                        # Static defaults are correct until a human changes
+                        # them, so they start "verified" rather than
+                        # "pending" - there's nothing extracted to review.
+                        validation_status="verified",
+                        is_dynamic=False,
+                    )
+                )
         self.db.commit()

@@ -38,13 +38,6 @@ services:
       - ollama_models:/root/.ollama
     ports:
       - "11435:11434"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
 
   gotenberg:
     image: gotenberg/gotenberg:8
@@ -66,6 +59,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       QDRANT_URL: http://qdrant:6333
       MODEL_URL: http://ollama:11434
+      MODEL_TIMEOUT_SECONDS: ${MODEL_TIMEOUT_SECONDS:-600}
       GOTENBERG_URL: http://gotenberg:3000
     volumes:
       - ./backend:/app

@@ -13,11 +13,11 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
-from docx import Document as DocxDocument
-from docx.oxml.ns import qn
-from docx.table import Table
-from docx.text.paragraph import Paragraph
+from typing import Any
+from docx import Document as DocxDocument  # type: ignore[import-not-found]
+from docx.oxml.ns import qn  # type: ignore[import-not-found]
+from docx.table import Table  # type: ignore[import-not-found]
+from docx.text.paragraph import Paragraph  # type: ignore[import-not-found]
 
 try:
     import fitz

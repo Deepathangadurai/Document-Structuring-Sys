@@ -241,14 +241,31 @@ export default function Templates() {
                       {section.section_name}
                     </h3>
                     <ul className="space-y-1.5">
-                      {section.fields.map((field) => (
-                        <li key={field.field_id} className="flex items-center justify-between text-sm">
-                          <span className="text-slate-700">{field.field_label}</span>
-                          <span className={field.required ? 'text-slate-500' : 'text-slate-400'}>
-                            {field.required ? 'required' : 'optional'}
-                          </span>
-                        </li>
-                      ))}
+                      {section.fields.map((field) => {
+                        const isDynamic = field.is_dynamic !== false
+                        return (
+                          <li key={field.field_id} className="flex items-center justify-between text-sm gap-2">
+                            <span className="text-slate-700 flex-1">{field.field_label}</span>
+                            <span className="flex items-center gap-1.5">
+                              {/* Static/Dynamic badge */}
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                  isDynamic
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                                }`}
+                                title={isDynamic ? 'Dynamic — extracted from source document' : 'Static — fixed boilerplate text'}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full inline-block ${isDynamic ? 'bg-blue-500' : 'bg-slate-400'}`} />
+                                {isDynamic ? 'Dynamic' : 'Static'}
+                              </span>
+                              <span className={field.required ? 'text-slate-500 text-xs' : 'text-slate-400 text-xs'}>
+                                {field.required ? 'required' : 'optional'}
+                              </span>
+                            </span>
+                          </li>
+                        )
+                      })}
                     </ul>
                   </div>
                 ))}
