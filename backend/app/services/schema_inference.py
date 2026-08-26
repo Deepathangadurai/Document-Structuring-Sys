@@ -37,13 +37,13 @@ except ImportError:
     fitz = None
 
 _LABEL_LINE_RE = re.compile(
-    r"^(?:(?P<prefix>[a-zA-Z]{1,3}[\.)]|[-*•])\s+)?(?P<label>[A-Za-z][A-Za-z0-9/&().' ][A-Za-z0-9/&().' -]{0,59})\s*(?P<sep>:|\s+-\s+)\s*(?P<value>.*)$"
+    r"^(?:(?P<prefix>[a-zA-Z]{1,3}[\.)]|\d{1,2}(?:\.\d{1,2}){0,3}\.?|[-*•])\s+)?(?P<label>[A-Za-z][A-Za-z0-9/&().' ][A-Za-z0-9/&().' -]{0,59})\s*(?P<sep>:|\s+-\s+)\s*(?P<value>.*)$"
 )
 _BLANK_LINE_RE = re.compile(
-    r"^(?:(?P<prefix>[a-zA-Z]{1,3}[\.)]|[-*•])\s+)?(?P<label>[A-Za-z][A-Za-z0-9/&().' ][A-Za-z0-9/&().' -]{0,59})\s*_{3,}\s*$"
+    r"^(?:(?P<prefix>[a-zA-Z]{1,3}[\.)]|\d{1,2}(?:\.\d{1,2}){0,3}\.?|[-*•])\s+)?(?P<label>[A-Za-z][A-Za-z0-9/&().' ][A-Za-z0-9/&().' -]{0,59})\s*_{3,}\s*$"
 )
 _LABEL_ONLY_RE = re.compile(
-    r"^(?:(?P<prefix>[a-zA-Z]{1,3}[\.)]|[-*•])\s+)?(?P<label>[A-Za-z][A-Za-z0-9/&().' ][A-Za-z0-9/&().' -]{0,59})\s*$"
+    r"^(?:(?P<prefix>[a-zA-Z]{1,3}[\.)]|\d{1,2}(?:\.\d{1,2}){0,3}\.?|[-*•])\s+)?(?P<label>[A-Za-z][A-Za-z0-9/&().' ][A-Za-z0-9/&().' -]{0,59})\s*$"
 )
 
 _STOPWORD_LABELS = {"note", "notes", "warning", "caution", "page", "section"}
@@ -56,7 +56,7 @@ def _normalize_label(label: str) -> str:
     if not cleaned:
         return ""
     cleaned = re.sub(r"^[-*•]\s+", "", cleaned)
-    cleaned = re.sub(r"^(?:[a-zA-Z]{1,3}[\.)])\s+", "", cleaned)
+    cleaned = re.sub(r"^(?:[a-zA-Z]{1,3}[\.)]|\d{1,2}(?:\.\d{1,2}){0,3}\.?)\s+", "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned.rstrip(":").strip()
 

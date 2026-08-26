@@ -68,6 +68,12 @@ export default function CreateProject() {
   // Step 2 — single source document
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  // uploadProgress hits 100 the instant every byte has left the browser -
+  // that's well before the server has finished saving/parsing the file
+  // and actually responded. Without this, the UI sat on "Uploading...
+  // 100%" for however long the server took afterward, which looked stuck.
+  const [awaitingServer, setAwaitingServer] = useState(false)
   const [documentId, setDocumentId] = useState<number | null>(null)
 
   // Step 3 — detected specifications (matched against the 13 master
@@ -103,8 +109,13 @@ export default function CreateProject() {
     if (!file || !projectId) return
     setError(null)
     setUploading(true)
+    setUploadProgress(0)
+    setAwaitingServer(false)
     try {
-      const document = await uploadDocument(projectId, file)
+      const document = await uploadDocument(projectId, file, (percent) => {
+        setUploadProgress(percent)
+        if (percent >= 100) setAwaitingServer(true)
+      })
       setDocumentId(document.id)
       advanceToStep(3)
       await runDetection()
@@ -112,6 +123,8 @@ export default function CreateProject() {
       setError(`Could not upload document: ${(err as Error).message}`)
     } finally {
       setUploading(false)
+      setUploadProgress(0)
+      setAwaitingServer(false)
     }
   }
 
@@ -126,7 +139,7 @@ export default function CreateProject() {
     } catch (err) {
       setDetectError(
         `Specification detection is not available yet: ${(err as Error).message}. ` +
-          `This calls a new backend endpoint (POST /projects/{id}/detect-specifications) that still needs to be implemented against Docling + the master templates.`,
+        `This calls a new backend endpoint (POST /projects/{id}/detect-specifications) that still needs to be implemented against Docling + the master templates.`,
       )
     } finally {
       setDetecting(false)
@@ -220,13 +233,12 @@ export default function CreateProject() {
                 className={`flex items-center ${s <= maxStepReached ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border-2 ${
-                    step === s
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border-2 ${step === s
                       ? 'border-brand text-brand bg-brand-light'
                       : step > s
                         ? 'border-brand bg-brand text-white'
                         : 'border-slate-300 text-slate-400 bg-white'
-                  }`}
+                    }`}
                 >
                   {step > s ? <Icons.Check className="w-4 h-4" /> : s}
                 </div>
@@ -342,9 +354,29 @@ export default function CreateProject() {
                     Remove
                   </Button>
                   <Button onClick={handleUploadAndDetect} disabled={uploading}>
-                    {uploading ? 'Uploading...' : 'Upload & Detect Specifications'}
+                    {!uploading
+                      ? 'Upload & Detect Specifications'
+                      : awaitingServer
+                        ? 'Processing on server...'
+                        : `Uploading... ${uploadProgress}%`}
                   </Button>
                 </div>
+                {uploading ? (
+                  <div className="mt-4">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full bg-brand ${awaitingServer ? 'animate-pulse' : 'transition-all duration-150'
+                          }`}
+                        style={{ width: awaitingServer ? '100%' : `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-slate-500 mt-2 text-right">
+                      {awaitingServer
+                        ? 'File received — server is saving and parsing it...'
+                        : `${uploadProgress}% sent to server`}
+                    </div>
+                  </div>
+                ) : null}
               </Card>
             )}
             <div className="mt-8 flex justify-between items-center">
@@ -399,9 +431,8 @@ export default function CreateProject() {
                   return (
                     <Card
                       key={d.template_id}
-                      className={`p-5 flex items-center justify-between transition-all ${
-                        isConfirmed ? 'ring-2 ring-brand border-brand' : ''
-                      } ${!isFound ? 'opacity-60' : ''}`}
+                      className={`p-5 flex items-center justify-between transition-all ${isConfirmed ? 'ring-2 ring-brand border-brand' : ''
+                        } ${!isFound ? 'opacity-60' : ''}`}
                     >
                       <div className="flex items-center gap-4">
                         <input

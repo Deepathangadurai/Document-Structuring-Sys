@@ -6,6 +6,9 @@ export interface TemplateField {
   page_number?: number | null
   extraction_hint?: string | null
   validation_rules?: unknown[]
+  // Whether this field is extracted per-document ("Dynamic") vs. a fixed
+  // boilerplate default carried by the template itself ("Static").
+  is_dynamic?: boolean
 }
 
 export interface TemplateSection {
@@ -120,6 +123,10 @@ export interface ExtractedFieldResponse {
   // during "Verify Document & Template". Optional because it's only
   // populated after a verify pass has run for the job.
   verification_status?: VerificationStatus | null
+  // Static fields (locked template defaults, not extracted per-document)
+  // are filtered out of the editable field list using this - see
+  // ProjectDetail.tsx's staticFields/dynamicFields split.
+  is_dynamic?: boolean
   source_references: SourceReferenceResponse[]
 }
 

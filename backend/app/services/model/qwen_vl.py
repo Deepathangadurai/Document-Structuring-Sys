@@ -26,6 +26,32 @@ class QwenVLProvider(ModelProvider):
     MAX_CONCURRENT_REQUESTS = 2
     CONNECT_RETRY_ATTEMPTS = 3
     CONNECT_RETRY_DELAY_SECONDS = 1.5
+    # On a CPU-only Ollama host, a single generate call for one section
+    # batch can legitimately take several minutes. A ReadTimeout there
+    # isn't a sign anything is broken - it's just slow - so it gets its own
+    # retry budget (separate from CONNECT_RETRY_*, which is for the
+    # instant "connection refused" case). Retrying with the same timeout
+    # gives a slow-but-alive Ollama instance more than one chance to finish
+    # before that section batch is given up on.
+    TIMEOUT_RETRY_ATTEMPTS = 2
+
+    # num_predict (the model's max output-token budget) was hardcoded to
+    # 1024 regardless of how many fields were in the batch. One field's
+    # JSON entry - field_id, field_name, value, confidence, plus a source
+    # object with page_number and a source_text snippet - realistically
+    # runs ~90-150 tokens once real values are involved. At
+    # MAX_FIELDS_PER_PROMPT=12, a completely ordinary full-batch response
+    # already reaches ~1000+ tokens - AT or OVER that fixed 1024 cap.
+    # Ollama then truncates generation mid-JSON, json.loads() throws on
+    # every call, and - because temperature=0 makes generation
+    # deterministic - every retry fails identically. This is very likely
+    # why extraction was returning nothing: not a field-mapping bug, but
+    # the model being cut off before it could finish writing valid JSON.
+    # num_predict is now sized to the actual batch (see
+    # _estimate_num_predict) instead of a fixed guess.
+    NUM_PREDICT_TOKENS_PER_FIELD = 160
+    NUM_PREDICT_BASE_OVERHEAD = 150  # template_id/version + JSON punctuation/structure
+    NUM_PREDICT_MAX = 4096
 
     def __init__(self):
         self.provider = "qwen2.5-vl"
@@ -43,6 +69,17 @@ class QwenVLProvider(ModelProvider):
         if len(text) <= max_chars:
             return text
         return text[:max_chars].rstrip() + "\n...[truncated]"
+
+    def _estimate_num_predict(self, template_schema: dict) -> int:
+        """Size the model's output-token budget to how many fields it's
+        actually being asked to fill in for this call, instead of a fixed
+        guess that silently truncates larger batches (see class docstring
+        note above NUM_PREDICT_TOKENS_PER_FIELD for why that mattered)."""
+        field_count = sum(
+            len(section.get("fields", [])) for section in template_schema.get("sections", [])
+        )
+        estimate = self.NUM_PREDICT_BASE_OVERHEAD + field_count * self.NUM_PREDICT_TOKENS_PER_FIELD
+        return max(512, min(self.NUM_PREDICT_MAX, estimate))
 
     def _candidate_urls(self) -> list[str]:
         candidates: list[str] = []
@@ -165,7 +202,7 @@ class QwenVLProvider(ModelProvider):
         prompt = "\n".join(prompt_parts)
         return prompt[: self.MAX_TOTAL_PROMPT_CHARS]
 
-    async def _call_ollama_generate_async(self, client: httpx.AsyncClient, prompt: str) -> dict:
+    async def _call_ollama_generate_async(self, client: httpx.AsyncClient, prompt: str, num_predict: int = 1024) -> dict:
         """Asynchronous API call reusing client session and limiting generation length.
 
         Local Ollama is a single background process, not a scaled service -
@@ -186,7 +223,7 @@ class QwenVLProvider(ModelProvider):
                 "stream": False,
                 "options": {
                     "temperature": 0,
-                    "num_predict": 1024,  # Enough for all fields to complete
+                    "num_predict": num_predict,
                 },
             }
             for attempt in range(self.CONNECT_RETRY_ATTEMPTS):
@@ -200,6 +237,14 @@ class QwenVLProvider(ModelProvider):
                     last_error = exc
                     if attempt < self.CONNECT_RETRY_ATTEMPTS - 1:
                         await asyncio.sleep(self.CONNECT_RETRY_DELAY_SECONDS * (attempt + 1))
+                        continue
+                    break
+                except httpx.TimeoutException as exc:
+                    # Slow-but-alive CPU inference, not a broken connection -
+                    # worth a couple of extra attempts at the same timeout
+                    # before moving to the next candidate URL / giving up.
+                    last_error = exc
+                    if attempt < self.TIMEOUT_RETRY_ATTEMPTS - 1:
                         continue
                     break
                 except Exception as exc:
@@ -221,9 +266,16 @@ class QwenVLProvider(ModelProvider):
                 f"(3) Ollama is overloaded by too many concurrent requests and briefly refusing new "
                 f"connections — retried automatically, but kept failing after {self.CONNECT_RETRY_ATTEMPTS} attempts."
             )
+        if isinstance(exc, httpx.TimeoutException):
+            return (
+                f"{exc} — Ollama didn't respond within {self.timeout}s (retried "
+                f"{self.TIMEOUT_RETRY_ATTEMPTS} times). On CPU this is often just slow inference, not a "
+                f"failure: raise MODEL_TIMEOUT_SECONDS in your .env, or reduce DOCUMENT_CHUNK_SIZE so each "
+                f"call has less to process, or switch to a GPU-backed Ollama host."
+            )
         return str(exc)
 
-    def _call_ollama_generate(self, prompt: str) -> dict:
+    def _call_ollama_generate(self, prompt: str, num_predict: int = 1024) -> dict:
         last_error = None
         for base_url in self._candidate_urls():
             url = f"{base_url.rstrip('/')}/api/generate"
@@ -234,7 +286,7 @@ class QwenVLProvider(ModelProvider):
                 "stream": False,
                 "options": {
                     "temperature": 0,
-                    "num_predict": 1024,
+                    "num_predict": num_predict,
                 },
             }
             for attempt in range(self.CONNECT_RETRY_ATTEMPTS):
@@ -249,6 +301,11 @@ class QwenVLProvider(ModelProvider):
                     last_error = exc
                     if attempt < self.CONNECT_RETRY_ATTEMPTS - 1:
                         time.sleep(self.CONNECT_RETRY_DELAY_SECONDS * (attempt + 1))
+                        continue
+                    break
+                except httpx.TimeoutException as exc:
+                    last_error = exc
+                    if attempt < self.TIMEOUT_RETRY_ATTEMPTS - 1:
                         continue
                     break
                 except Exception as exc:
@@ -291,12 +348,24 @@ class QwenVLProvider(ModelProvider):
 
     async def _extract_single_schema_async(self, client: httpx.AsyncClient, template_schema: dict, pages: list[dict], semaphore: "asyncio.Semaphore") -> dict:
         prompt = self._build_prompt(template_schema, pages)
+        num_predict = self._estimate_num_predict(template_schema)
         async with semaphore:
-            data = await self._call_ollama_generate_async(client, prompt)
+            data = await self._call_ollama_generate_async(client, prompt, num_predict=num_predict)
         raw_text = data.get("response", "")
         try:
             parsed = json.loads(raw_text)
         except (json.JSONDecodeError, TypeError) as exc:
+            # A truncated response (hit num_predict before finishing the
+            # JSON) surfaces here as invalid JSON - flag it distinctly so
+            # it's obvious in logs/error_message that the fix is a bigger
+            # token budget or a smaller batch, not a document problem.
+            done_reason = data.get("done_reason")
+            if done_reason == "length":
+                raise RuntimeError(
+                    f"Model response was truncated at num_predict={num_predict} tokens before finishing "
+                    f"valid JSON ({exc}). Raise NUM_PREDICT_MAX / NUM_PREDICT_TOKENS_PER_FIELD, or lower "
+                    f"MAX_FIELDS_PER_PROMPT so each batch needs less output."
+                ) from exc
             raise RuntimeError(f"Model response was not valid JSON ({exc}).") from exc
 
         if not isinstance(parsed, dict) or "fields" not in parsed:
@@ -308,11 +377,19 @@ class QwenVLProvider(ModelProvider):
 
     def _extract_single_schema(self, template_schema: dict, pages: list[dict]) -> dict:
         prompt = self._build_prompt(template_schema, pages)
-        data = self._call_ollama_generate(prompt)
+        num_predict = self._estimate_num_predict(template_schema)
+        data = self._call_ollama_generate(prompt, num_predict=num_predict)
         raw_text = data.get("response", "")
         try:
             parsed = json.loads(raw_text)
         except (json.JSONDecodeError, TypeError) as exc:
+            done_reason = data.get("done_reason")
+            if done_reason == "length":
+                raise RuntimeError(
+                    f"Model response was truncated at num_predict={num_predict} tokens before finishing "
+                    f"valid JSON ({exc}). Raise NUM_PREDICT_MAX / NUM_PREDICT_TOKENS_PER_FIELD, or lower "
+                    f"MAX_FIELDS_PER_PROMPT so each batch needs less output."
+                ) from exc
             raise RuntimeError(f"Model response was not valid JSON ({exc}).") from exc
 
         if not isinstance(parsed, dict) or "fields" not in parsed:
@@ -345,16 +422,37 @@ class QwenVLProvider(ModelProvider):
         async with httpx.AsyncClient() as client:
             semaphore = asyncio.Semaphore(self.max_concurrent_requests)
             tasks = [self._extract_single_schema_async(client, schema, pages, semaphore) for schema in batch_schemas]
-            results = await asyncio.gather(*tasks)
+            # return_exceptions=True is the whole fix here: previously one
+            # section batch timing out (very plausible on CPU-only Ollama)
+            # raised inside gather() and killed every other batch's result
+            # along with it, which extraction_service then treated as the
+            # entire chunk - and therefore the entire job - failing, even
+            # though most batches may have already succeeded. Now a failed
+            # batch just contributes zero fields instead of discarding
+            # everything; those fields fall through to the "missing,
+            # needs manual entry" path instead of losing the whole job.
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
         combined_fields: list[dict] = []
-        for section_result in results:
-            combined_fields.extend(section_result.get("fields", []))
+        failed_batches: list[str] = []
+        for section_batch, result in zip(batch_schemas, results):
+            if isinstance(result, BaseException):
+                section_name = (section_batch.get("sections") or [{}])[0].get("section_name", "unknown section")
+                failed_batches.append(f"{section_name}: {result}")
+                continue
+            combined_fields.extend(result.get("fields", []))
+
+        if failed_batches:
+            # Surfaced through to job.error_message-adjacent logging by the
+            # caller rather than raised, so a partial success still returns
+            # usable data instead of nothing.
+            print(f"[qwen_vl] {len(failed_batches)}/{len(batch_schemas)} section batches failed: {failed_batches}", flush=True)
 
         return {
             "template_id": template_schema.get("template_id"),
             "template_version": template_schema.get("version"),
             "fields": combined_fields,
+            "failed_batches": failed_batches,
         }
 
     def extract(self, template_schema: dict, pages: list[dict]) -> dict:

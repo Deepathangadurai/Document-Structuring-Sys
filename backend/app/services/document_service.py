@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -15,6 +16,51 @@ from app.core.config import settings
 from app.db.models import Document, DocumentPage, Project
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg", ".tiff", ".bmp"}
+
+# Characters a genuine text layer is overwhelmingly made of: letters,
+# digits, whitespace, and common punctuation/symbols found in engineering
+# specs (units, dashes, slashes, etc).
+_PLAUSIBLE_TEXT_CHARS = re.compile(r"[A-Za-z0-9\s\.,;:\-\+\/\(\)%'\"&#@=_]")
+
+# A broken font's ToUnicode mapping usually decodes a small handful of
+# glyph codes wrong and repeats them - so the telltale sign in practice is
+# a short chunk (roughly one glyph-cluster's worth of characters) repeating
+# immediately several times in a row, e.g. "1545-E0..x1545-E0..x1545-E0..x".
+# This catches that case even when the wrong characters happen to be
+# digits/dashes that would otherwise look "plausible" by charset alone.
+_REPEATED_CHUNK = re.compile(r"(.{3,25}?)\1{2,}")
+# Decorative table/section rules ("----", "....", "____") are legitimate
+# and repeat by design - don't let those alone trip the repetition check.
+_BORDER_CHARS = set("-_.=*# ")
+
+
+def _looks_like_garbage_text(text: str, min_ratio: float = 0.6) -> bool:
+    """PyMuPDF's page.get_text() returns whatever the PDF's font encoding
+    maps character codes to. Some PDFs (commonly CAD/drafting-tool exports)
+    embed subset fonts with a broken or missing ToUnicode CMap - get_text()
+    still returns a non-empty string, but it's garbled glyph soup, not real
+    text (this is what produces repeating symbol strings like
+    "\\1545-E0(check)x1545-" instead of the actual field values).
+    Treating "non-empty" as "usable" let that garbage flow straight into
+    the extraction model instead of falling back to OCR. Two independent
+    checks: an unusual-character ratio (catches non-printable glyph soup),
+    and immediate short-chunk repetition covering a large share of the
+    text (catches broken mappings that happen to decode to plausible
+    characters like digits/dashes, which the ratio check alone misses).
+    """
+    stripped = text.strip()
+    if not stripped:
+        return True
+    plausible = len(_PLAUSIBLE_TEXT_CHARS.findall(stripped))
+    if (plausible / len(stripped)) < min_ratio:
+        return True
+    m = _REPEATED_CHUNK.search(stripped)
+    if m:
+        chunk = m.group(1).strip()
+        is_border_style = set(chunk) <= _BORDER_CHARS
+        if not is_border_style and len(chunk) >= 3 and len(m.group(0)) >= 0.3 * len(stripped):
+            return True
+    return False
 
 class DocumentService:
     def __init__(self, db: Session):
@@ -139,7 +185,7 @@ class DocumentService:
             for number, page in enumerate(pdf_doc, start=1):
                 text = page.get_text() or ""
                 image_path = None
-                if not text.strip():
+                if _looks_like_garbage_text(text):
                     pix = page.get_pixmap()
                     image_path = self._save_page_image(doc_id, number, pix.pil_tobytes(format="PNG"))
                     text = self._ocr_image_bytes(pix.tobytes("png"))

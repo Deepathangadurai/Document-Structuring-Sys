@@ -150,9 +150,10 @@ class TemplateService:
                 # BUG (root cause of tables disappearing from already-synced
                 # templates): schema.json on disk is deploy-time seed data
                 # and never carries the heavy, computed-at-parse-time keys
-                # (page_html with its data-field-id table markup,
-                # page_images, preview_html, document_sections,
-                # text_preview) - those only ever get produced once, by
+                # (sections with their per-row table field_ids, page_html
+                # with its data-field-id table markup, page_images,
+                # preview_html, document_sections, text_preview) - those
+                # only ever get produced once, by
                 # infer_schema_sections_with_page_count(), either the first
                 # time a brand-new template folder is synced (see the
                 # `else` branch below) or via the pending-review/finalize
@@ -163,19 +164,35 @@ class TemplateService:
                 # restart, since sync runs on a TTL). Once erased, every
                 # page for that template silently fell back to plain text
                 # rendering with no tables and no editable spans, and there
-                # was no way to get them back short of re-uploading. Merge
-                # instead: only let the file take precedence for keys it
-                # actually declares (real content edits like `sections`
-                # should still apply), and keep whatever the DB already
-                # computed for anything the file is silent on.
+                # was no way to get them back short of re-uploading.
+                #
+                # `sections` specifically was NOT in the original protected
+                # list, which was its own bug: schema.json's `sections`
+                # stub is a truthy (non-empty) value even when it's just a
+                # handful of placeholder cover-page fields, so the old
+                # `if not schema.get(computed_key)` guard never fired for
+                # it - disk's stub always won. That meant `page_html` could
+                # correctly keep showing a fully-structured page (tables,
+                # multi-section layout) while `sections` - the field list
+                # that actually drives what the extraction model is told to
+                # look for, and what "Values on This Page" matches against
+                # - kept getting silently reset to the seed stub on every
+                # restart. Result: boxes render on the page (from the
+                # preserved page_html) but nothing ever populates or saves
+                # into them, because as far as extraction is concerned
+                # those fields don't exist. Once a template has real
+                # DB-computed content for any of these keys, prefer it
+                # unconditionally over disk - disk only gets to seed a
+                # brand-new template (the `else` branch), never to shrink
+                # an existing one back down.
                 existing_schema = getattr(template, "schema")
                 existing_schema = existing_schema if isinstance(existing_schema, dict) else {}
                 merged_schema = {**existing_schema, **schema}
                 for computed_key in (
-                    "page_html", "page_images", "preview_html",
+                    "sections", "page_html", "page_images", "preview_html",
                     "document_sections", "text_preview", "static_blocks",
                 ):
-                    if not schema.get(computed_key) and existing_schema.get(computed_key):
+                    if existing_schema.get(computed_key):
                         merged_schema[computed_key] = existing_schema[computed_key]
                 if merged_schema != existing_schema:
                     setattr(template, "schema", merged_schema)

@@ -415,32 +415,74 @@ class ExtractionService:
         if reference_text:
             schema_dict["reference_document_text"] = reference_text
 
+        # A single chunk failing (slow CPU inference timing out, a
+        # transient Ollama hiccup, etc.) previously aborted the WHOLE job
+        # immediately, discarding every field already extracted from prior
+        # chunks - even if only the last of 10 chunks had a problem. Each
+        # chunk now gets its own retry budget, and a chunk that still fails
+        # after retries is skipped (its fields fall through to the
+        # required-missing/manual-entry path below) rather than failing
+        # every other chunk's work along with it. The job only fails
+        # outright if EVERY chunk fails, i.e. nothing usable came out of it.
+        CHUNK_RETRY_ATTEMPTS = 3
+        CHUNK_RETRY_DELAY_SECONDS = 5
+        chunk_failures: list[str] = []
+
         for chunk_index, chunk in enumerate(page_chunks, start=1):
-            job.current_page = chunk[-1].page_number if chunk else 0  # type: ignore[assignment]
-            job.progress = int(chunk_index / total_chunks * 100)  # type: ignore[assignment]
+            # Only mark this job as "processing" here - progress and
+            # current_page are updated AFTER the chunk actually finishes,
+            # below. Setting progress to chunk_index/total_chunks*100
+            # here (before this chunk's extraction call, with its retries,
+            # has even run) is what caused the UI to show "Page 20 of 20"
+            # / 100% while the job was still very much in progress on a
+            # slow CPU - progress must reflect completed work, not started
+            # work, and should never visually claim 100% until job.status
+            # is actually "completed" further down.
             job.status = "processing"  # type: ignore[assignment]
             self.db.add(job)
-            self.db.commit()  # must commit so polling endpoint sees progress updates
+            self.db.commit()  # must commit so polling endpoint sees the status flip promptly
 
-            try:
-                model_output = model_service.extract(
-                    schema_dict,
-                    [{"page_number": page.page_number, "text": page.text or ""} for page in chunk]
+            model_output = None
+            last_exc: Exception | None = None
+            for attempt in range(1, CHUNK_RETRY_ATTEMPTS + 1):
+                try:
+                    model_output = model_service.extract(
+                        schema_dict,
+                        [{"page_number": page.page_number, "text": page.text or ""} for page in chunk]
+                    )
+                    last_exc = None
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    logger.warning(
+                        "Extraction chunk %s/%s attempt %s/%s failed: %s",
+                        chunk_index, total_chunks, attempt, CHUNK_RETRY_ATTEMPTS, exc,
+                    )
+                    if attempt < CHUNK_RETRY_ATTEMPTS:
+                        time.sleep(CHUNK_RETRY_DELAY_SECONDS * attempt)
+
+            # This chunk (with all its retries) is now actually finished,
+            # one way or another - only now does progress/current_page
+            # advance to include it. Capped at 99 so a client polling
+            # mid-job never sees 100% next to a still-"processing" status;
+            # true 100 is reserved for the final completed commit below.
+            job.current_page = chunk[-1].page_number if chunk else 0  # type: ignore[assignment]
+            job.progress = min(99, int(chunk_index / total_chunks * 100))  # type: ignore[assignment]
+            self.db.add(job)
+            self.db.commit()
+
+            if last_exc is not None:
+                chunk_failures.append(
+                    f"pages {chunk[0].page_number}-{chunk[-1].page_number}: {last_exc}"
                 )
-            except Exception as exc:
-                job.status = "failed"  # type: ignore[assignment]
-                job.error_message = f"Qwen2.5-VL extraction call failed: {exc}"  # type: ignore[assignment]
-                self.db.add(job)
-                self.db.commit()
-                return
+                continue  # move on to the next chunk instead of failing the whole job
 
             is_valid, validated_res = self._validate_output(model_output, schema_dict)
             if not is_valid:
-                job.status = "failed"  # type: ignore[assignment]
-                job.error_message = str(validated_res)  # type: ignore[assignment]
-                self.db.add(job)
-                self.db.commit()
-                return
+                chunk_failures.append(
+                    f"pages {chunk[0].page_number}-{chunk[-1].page_number}: {validated_res}"
+                )
+                continue
 
             validated_data = cast(dict, validated_res)
             for field in validated_data.get("fields", []):
@@ -456,6 +498,15 @@ class ExtractionService:
                     accumulated_fields[field_id]["source"] = field.get("source")
 
             self.db.commit()  # hard commit after each successful model call
+
+        if chunk_failures and len(chunk_failures) == total_chunks:
+            # Every chunk failed - there's genuinely nothing usable to
+            # store, so this is the one case that should still fail the job.
+            job.status = "failed"  # type: ignore[assignment]
+            job.error_message = "Qwen2.5-VL extraction failed for every page chunk: " + "; ".join(chunk_failures)  # type: ignore[assignment]
+            self.db.add(job)
+            self.db.commit()
+            return
 
         final_output = {
             "template_id": schema_dict.get("template_id"),
@@ -476,6 +527,17 @@ class ExtractionService:
         job.current_page = job.total_pages  # type: ignore[assignment]
         job.status = "completed"  # type: ignore[assignment]
         job.completed_at = datetime.utcnow()  # type: ignore[assignment]
+        if chunk_failures:
+            # Partial success: some chunks never came back even after
+            # retries, so whatever fields they held are still sitting as
+            # "missing"/never-populated (see required_missing_ids above,
+            # and any non-required fields from those pages just stay
+            # unfound) - surfaced here rather than hidden, so it's clear
+            # the job succeeded but didn't see every page.
+            job.error_message = (  # type: ignore[assignment]
+                f"Completed with {len(chunk_failures)}/{total_chunks} page chunk(s) unresolved after retries "
+                f"(fields from those pages need manual entry): " + "; ".join(chunk_failures)
+            )
         self.db.add(job)
         self.db.commit()
 
@@ -550,8 +612,19 @@ class ExtractionService:
                 return False, f"Duplicate field: {field_id}"
             seen_field_ids.add(field_id)
             field_info = expected_fields[field_id]
-            if field.get("field_name") != field_info["field_label"]:
-                return False, f"Field name mismatch for {field_id}: expected {field_info['field_label']}"
+            # field_id is already the authoritative match key (checked
+            # above) - field_name is just the model's echo of the label
+            # back, for readability. Requiring it to match byte-for-byte
+            # used to fail this field's ENTIRE chunk (discarding every
+            # other correctly-extracted field alongside it) over trivial,
+            # extremely common LLM variation - different casing, a
+            # dropped/added period, "Spec No" vs "Spec. No." - even though
+            # the actual field_id + value + confidence + source were all
+            # completely correct. Since temperature=0, that failure was
+            # deterministic and repeated identically on every retry. Now
+            # it's just normalized to the schema's authoritative label
+            # instead of gating validity on it.
+            field["field_name"] = field_info["field_label"]
             if "source" in field and field["source"] is not None and not isinstance(field["source"], dict):
                 return False, "Invalid source object"
             source = field.get("source") or {}

@@ -36,13 +36,29 @@ class Settings(BaseSettings):
     MODEL_URL: str = "http://localhost:11434"
     MODEL_NAME: str = "qwen2.5vl:7b"
     MODEL_DEVICE: str = "auto"
-    MODEL_TIMEOUT_SECONDS: int = 300
+    # 900s (15 min) per model call, not 300s - qwen2.5vl:7b on CPU-only
+    # Ollama can legitimately take several minutes for one section-batch
+    # call, and this used to be the main cause of "extraction doesn't
+    # work" on CPU. Raise further here (or in .env) if it's still not
+    # enough for your hardware; lower it once you're on GPU, where a
+    # single call finishing in seconds means 900s of *wasted* wait before
+    # the timeout/retry logic in qwen_vl.py would even kick in.
+    MODEL_TIMEOUT_SECONDS: int = 900
     # A single local Ollama process handling one model instance can refuse
     # connections outright (errno 111) under too many simultaneous requests.
     # Raise this only if Ollama is running with multiple parallel model
     # slots (OLLAMA_NUM_PARALLEL) or on a beefier machine.
     MODEL_MAX_CONCURRENT_REQUESTS: int = 3
-    DOCUMENT_CHUNK_SIZE: int = 20
+    # 20 meant a typical ~20-page spec document was ONE single chunk -
+    # job.progress had nothing to report between 0% and done, since there
+    # was only one chunk to ever finish. That's why the extraction
+    # progress bar looked like it "wasn't showing progress" - it wasn't a
+    # display bug, there was genuinely no intermediate state to show.
+    # Smaller chunks give visible incremental movement (a 20-page doc is
+    # now ~4 chunks instead of 1) and, as a bonus, each model call has
+    # less to do, which also makes CPU timeouts less likely in the first
+    # place.
+    DOCUMENT_CHUNK_SIZE: int = 5
     LIBREOFFICE_PATH: str | None = None
     # Gotenberg (https://gotenberg.dev) runs LibreOffice and exposes it as
     # an HTTP conversion service. No-Docker setup: run `gotenberg` as a

@@ -27,12 +27,28 @@ function getFieldDisplayValue(field: ExtractedFieldResponse): string {
 // the tagged <span data-field-id> inside the rendered document - this is
 // the only place a value's status is shown, there is no separate status
 // column anywhere else.
+// A field's span collapses to just its 4px of horizontal padding when the
+// value is empty (the exact case that matters most - missing fields) with
+// no text to give it width, making it an almost-impossible click target
+// inside a rendered document table. min-width/min-height give every span
+// a real clickable footprint even at zero characters, so the highlighted
+// box in the document is at minimum something a person can actually see
+// and click - though editing itself now happens via the sidebar input,
+// not by typing directly into this span (see startEditingField).
+// "missing" used to be a solid pink/red block (#fee2e2 fill) sitting
+// directly in the document - since it's the state most fields start in,
+// that meant a strong red-ish color block was the dominant thing on the
+// page, reading as loud/alarming (described as "orange") rather than "this
+// one still needs a value." Toned down to a thin dashed outline with no
+// fill, matching how a plain, un-filled-in field looks in Jira/most clean
+// form UIs - still clearly marked (dashed red outline + light red text),
+// just not a filled block.
 const STATUS_STYLE: Record<string, string> = {
-  verified: 'background:#dcfce7; outline:1px solid #16a34a; outline-offset:1px; padding:0 2px; border-radius:2px;',
-  rejected: 'background:#f1f5f9; outline:1px dashed #94a3b8; outline-offset:1px; padding:0 2px; border-radius:2px; color:#94a3b8; font-style:italic;',
-  review: 'background:#fef3c7; outline:1px solid #d97706; outline-offset:1px; padding:0 2px; border-radius:2px;',
-  missing: 'background:#fee2e2; outline:1px dashed #dc2626; outline-offset:1px; padding:0 2px; border-radius:2px;',
-  pending: 'background:#fff8dc; outline:1px dashed #c99a1e; outline-offset:1px; padding:0 2px; border-radius:2px;',
+  verified: 'background:#f0fdf4; outline:1px solid #16a34a; outline-offset:1px; padding:1px 6px; border-radius:2px; min-width:60px; min-height:1.1em; display:inline-block;',
+  rejected: 'background:transparent; outline:1px dashed #cbd5e1; outline-offset:1px; padding:1px 6px; border-radius:2px; color:#94a3b8; font-style:italic; min-width:60px; min-height:1.1em; display:inline-block;',
+  review: 'background:#f0f7ff; outline:1px solid #1565c0; outline-offset:1px; padding:1px 6px; border-radius:2px; min-width:60px; min-height:1.1em; display:inline-block;',
+  missing: 'background:transparent; outline:1px dashed #dc2626; outline-offset:1px; padding:1px 6px; border-radius:2px; color:#b91c1c; min-width:60px; min-height:1.1em; display:inline-block;',
+  pending: 'background:transparent; outline:1px dashed #cbd5e1; outline-offset:1px; padding:1px 6px; border-radius:2px; color:#94a3b8; min-width:60px; min-height:1.1em; display:inline-block;',
 }
 
 // "Verify Document & Template" verdicts map onto the same badge component
@@ -78,6 +94,18 @@ export default function ProjectDetail() {
   // input anywhere else that could get out of sync with it.
   const [edits, setEdits] = useState<{ [fieldId: string]: string }>({})
   const [savingFieldId, setSavingFieldId] = useState<string | null>(null)
+  // Jira-style inline edit: clicking a field's value turns THAT ROW into a
+  // real text input with confirm (check) / cancel (x) buttons right next
+  // to it, instead of relying on the person finding and clicking a nearly
+  // invisible contenteditable span inside the rendered document table -
+  // that span can be a couple pixels wide when the value is empty (the
+  // exact case that matters most: missing fields), which is why editing
+  // looked like it "wasn't working." The document pane still highlights
+  // the field and its status, but the sidebar input is now the one place
+  // typing actually happens.
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
+  const [draftValue, setDraftValue] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
 
   const docRef = useRef<HTMLDivElement>(null)
 
@@ -279,11 +307,13 @@ export default function ProjectDetail() {
   }, [pagePreview?.page_html, extractedByFieldId])
 
   // Paint each tagged span with the extracted value (or the user's
-  // in-progress edit) and its status color, and wire typing in the
-  // document straight into `edits`. This runs whenever the page HTML or
-  // the underlying field data changes - the document is always the
-  // single editable surface, nothing here reads from or writes to a
-  // separate form.
+  // in-progress edit) and its status color. Clicking a span opens that
+  // field for editing in the sidebar (see startEditingField) instead of
+  // being directly contenteditable - typing straight into a table cell
+  // inside the rendered document was fragile (easy to mis-click, easy to
+  // break the surrounding table's layout, and the span could be visually
+  // tiny for empty values). The document is now a live preview + click
+  // target; the sidebar input is the one place text entry happens.
   const bindEditableFields = useCallback(() => {
     const container = docRef.current
     if (!container) return
@@ -296,17 +326,17 @@ export default function ProjectDetail() {
       if (span.textContent !== value) span.textContent = value
 
       const status = field?.validation_status || 'pending'
-      span.setAttribute('style', STATUS_STYLE[status] || STATUS_STYLE.pending)
-      span.setAttribute('contenteditable', 'true')
-      span.title = field ? `${field.field_label} - ${status}` : fieldId
+      span.setAttribute('style', `${STATUS_STYLE[status] || STATUS_STYLE.pending} cursor:pointer;`)
+      span.removeAttribute('contenteditable')
+      span.title = field ? `${field.field_label} - click to edit` : fieldId
 
-      const handler = () => {
-        const text = (span.textContent || '').trim()
-        setEdits((prev) => (prev[fieldId] === text ? prev : { ...prev, [fieldId]: text }))
+      const handler = (e: Event) => {
+        e.preventDefault()
+        if (field) startEditingField(field)
       }
-      span.removeEventListener('input', (span as any).__fieldInputHandler)
-        ; (span as any).__fieldInputHandler = handler
-      span.addEventListener('input', handler)
+      span.removeEventListener('click', (span as any).__fieldClickHandler)
+        ; (span as any).__fieldClickHandler = handler
+      span.addEventListener('click', handler)
     })
   }, [edits, extractedByFieldId])
 
@@ -322,61 +352,45 @@ export default function ProjectDetail() {
     const el = docRef.current?.querySelector<HTMLElement>(`[data-field-id="${fieldId}"]`)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.focus()
-      const range = document.createRange()
-      range.selectNodeContents(el)
-      const sel = window.getSelection()
-      sel?.removeAllRanges()
-      sel?.addRange(range)
     }
   }
 
-  async function handleApprove(field: ExtractedFieldResponse) {
+  function startEditingField(field: ExtractedFieldResponse) {
+    setEditingFieldId(field.field_id)
+    setDraftValue(edits[field.field_id] ?? getFieldDisplayValue(field))
+    focusField(field.field_id)
+    // autoFocus on the input covers the normal case; this covers
+    // re-clicking the same row that's already rendered.
+    requestAnimationFrame(() => editInputRef.current?.focus())
+  }
+
+  function cancelEditingField() {
+    setEditingFieldId(null)
+    setDraftValue('')
+  }
+
+  // The check button: writes the typed value straight to the field AND
+  // marks it verified in one action, same as clicking a Jira title away
+  // from the input commits it - there's no separate "save draft" step to
+  // forget about.
+  async function confirmEditingField(field: ExtractedFieldResponse) {
     if (!jobForSelectedDocument) return
+    const value = draftValue
     setSavingFieldId(field.field_id)
     try {
-      const value = edits[field.field_id] ?? getFieldDisplayValue(field)
       await updateExtractedField(jobForSelectedDocument.id, field.field_id, {
         value,
         validation_status: 'verified',
       })
+      const span = docRef.current?.querySelector<HTMLElement>(`[data-field-id="${field.field_id}"]`)
+      if (span) span.textContent = value
       setEdits((prev) => {
         const next = { ...prev }
         delete next[field.field_id]
         return next
       })
-      await loadProject()
-    } catch (err) {
-      setError(`Could not approve field: ${(err as Error).message}`)
-    } finally {
-      setSavingFieldId(null)
-    }
-  }
-
-  // Saving an edit without approving/rejecting it. Requirement #11 asks
-  // for Accept, Edit, or Reject as three distinct actions, but until now
-  // "Edit" only ever persisted if the user also clicked Approve - typing
-  // in the document and then switching specs (which clears `edits`, see
-  // the effect above) silently discarded the change with no save and no
-  // warning. This persists the edited value with status "review" (edited,
-  // not yet approved) so it survives a job switch/reload and is visibly
-  // flagged as needing a follow-up look, distinct from both "verified"
-  // and "pending" (never touched).
-  async function handleSaveEdit(field: ExtractedFieldResponse) {
-    if (!jobForSelectedDocument) return
-    const value = edits[field.field_id] ?? getFieldDisplayValue(field)
-    if (value === getFieldDisplayValue(field) && field.validation_status !== 'pending') return
-    setSavingFieldId(field.field_id)
-    try {
-      await updateExtractedField(jobForSelectedDocument.id, field.field_id, {
-        value,
-        validation_status: 'review',
-      })
-      setEdits((prev) => {
-        const next = { ...prev }
-        delete next[field.field_id]
-        return next
-      })
+      setEditingFieldId(null)
+      setDraftValue('')
       await loadProject()
     } catch (err) {
       setError(`Could not save edit: ${(err as Error).message}`)
@@ -384,6 +398,13 @@ export default function ProjectDetail() {
       setSavingFieldId(null)
     }
   }
+
+  // handleApprove and handleSaveEdit used to be separate buttons for
+  // "keep as-is" vs. "save an edit" - both are now just
+  // confirmEditingField above (the Jira-style check button always writes
+  // the current draft, whether or not the person changed the text, and
+  // always marks it verified). Removed rather than left dead so there's
+  // one obvious place this logic lives, not three that can drift apart.
 
   // Restore this field back to what extraction originally produced,
   // discarding any edit/approve/reject that's happened since. Distinct
@@ -673,32 +694,60 @@ export default function ProjectDetail() {
                     const isSaving = savingFieldId === field.field_id
                     const currentValue = edits[field.field_id] ?? getFieldDisplayValue(field)
                     const verdict = verifyByFieldId[field.field_id]
+                    const isEditing = editingFieldId === field.field_id
                     return (
                       <div
                         key={field.field_id}
-                        className="rounded border border-slate-200 bg-white p-2.5 hover:border-brand transition-colors"
+                        className={`rounded border p-2.5 transition-colors ${isEditing ? 'border-brand ring-1 ring-brand bg-blue-50/40' : 'border-slate-200 bg-white hover:border-brand'
+                          }`}
                       >
-                        <button
-                          type="button"
-                          onClick={() => focusField(field.field_id)}
-                          className="w-full text-left"
-                        >
-                          <div className="font-medium text-slate-900 text-xs">{field.field_label}</div>
-                          <div className="text-xs text-slate-600 mt-0.5 truncate">
-                            {currentValue || <span className="italic text-slate-400">empty</span>}
+                        <div className="font-medium text-slate-900 text-xs mb-1">{field.field_label}</div>
+                        {isEditing ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              ref={editInputRef}
+                              autoFocus
+                              type="text"
+                              value={draftValue}
+                              onChange={(e) => setDraftValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') void confirmEditingField(field)
+                                if (e.key === 'Escape') cancelEditingField()
+                              }}
+                              className="flex-1 text-sm border border-brand rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand"
+                              placeholder="Enter a value..."
+                            />
+                            <button
+                              type="button"
+                              disabled={isSaving}
+                              onClick={() => void confirmEditingField(field)}
+                              className="text-green-600 hover:text-green-700 disabled:opacity-40 shrink-0"
+                              title="Confirm"
+                            >
+                              <Icons.Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSaving}
+                              onClick={cancelEditingField}
+                              className="text-slate-400 hover:text-slate-600 disabled:opacity-40 shrink-0"
+                              title="Cancel"
+                            >
+                              <Icons.X className="w-4 h-4" />
+                            </button>
                           </div>
-                        </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startEditingField(field)}
+                            className="w-full text-left text-xs text-slate-600 border border-dashed border-transparent hover:border-slate-300 hover:bg-slate-50 rounded px-1.5 py-1 -mx-1.5 transition-colors"
+                            title="Click to edit"
+                          >
+                            {currentValue || <span className="italic text-slate-400">Click to add a value...</span>}
+                          </button>
+                        )}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Badge type={field.validation_status}>{field.validation_status}</Badge>
-                          {edits[field.field_id] !== undefined &&
-                            edits[field.field_id] !== getFieldDisplayValue(field) ? (
-                            <span
-                              className="text-[10px] font-medium text-amber-600"
-                              title="Typed in the document but not yet saved, approved, or rejected"
-                            >
-                              unsaved
-                            </span>
-                          ) : null}
                           {verdict ? (
                             <Badge type={verifyBadgeType(verdict.status)} title={verdict.reason ?? undefined}>
                               {verifyLabel(verdict.status)}
@@ -708,7 +757,7 @@ export default function ProjectDetail() {
                             <span className="text-[10px] text-slate-400">{Math.round(field.confidence * 100)}%</span>
                           ) : null}
                           <div className="flex-1" />
-                          {field.original_value !== undefined &&
+                          {!isEditing && field.original_value !== undefined &&
                             field.original_value !== null &&
                             (currentValue !== field.original_value || field.validation_status !== 'pending') ? (
                             <button
@@ -720,30 +769,16 @@ export default function ProjectDetail() {
                               <Icons.Undo className="w-4 h-4" />
                             </button>
                           ) : null}
-                          <button
-                            disabled={isSaving || edits[field.field_id] === undefined}
-                            onClick={() => void handleSaveEdit(field)}
-                            className="text-amber-600 hover:text-amber-700 disabled:opacity-30"
-                            title="Save this edit for review (without approving or rejecting it)"
-                          >
-                            <Icons.Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            disabled={isSaving}
-                            onClick={() => void handleApprove(field)}
-                            className="text-green-600 hover:text-green-700 disabled:opacity-40"
-                            title="Approve this value"
-                          >
-                            <Icons.Check className="w-4 h-4" />
-                          </button>
-                          <button
-                            disabled={isSaving}
-                            onClick={() => void handleReject(field)}
-                            className="text-red-600 hover:text-red-700 disabled:opacity-40"
-                            title="Reject and clear this value"
-                          >
-                            <Icons.X className="w-4 h-4" />
-                          </button>
+                          {!isEditing ? (
+                            <button
+                              disabled={isSaving}
+                              onClick={() => void handleReject(field)}
+                              className="text-red-600 hover:text-red-700 disabled:opacity-40"
+                              title="Reject and clear this value"
+                            >
+                              <Icons.X className="w-4 h-4" />
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                     )
