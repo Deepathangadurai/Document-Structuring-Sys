@@ -99,6 +99,18 @@ def get_template(template_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Template not found")
     return template
 
+@router.delete("/templates/{template_id}")
+def delete_template(template_id: str, force: bool = False, db: Session = Depends(get_db)):
+    service = TemplateService(db)
+    try:
+        service.delete_template(template_id, force=force)
+    except ValueError as exc:
+        # "not found" and "in use" both come through here - the message
+        # itself is what distinguishes them for the caller.
+        status = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status, detail=str(exc))
+    return {"deleted": True}
+
 @router.get("/templates/{template_id}/preview", response_model=TemplatePreviewResponse)
 def preview_template(template_id: str, db: Session = Depends(get_db)):
     service = TemplateService(db)

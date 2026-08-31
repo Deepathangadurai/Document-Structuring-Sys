@@ -6,9 +6,6 @@ export interface TemplateField {
   page_number?: number | null
   extraction_hint?: string | null
   validation_rules?: unknown[]
-  // Whether this field is extracted per-document ("Dynamic") vs. a fixed
-  // boilerplate default carried by the template itself ("Static").
-  is_dynamic?: boolean
 }
 
 export interface TemplateSection {
@@ -23,17 +20,6 @@ export interface DocumentSection {
   section_number: number
   content_html: string
   paragraphs: unknown[]
-}
-
-export interface StaticBlock {
-  block_id: string
-  page_number: number
-  block_type: 'paragraph' | 'heading' | 'table'
-  text: string
-  looks_like_blank_field: boolean
-  // Only present for paragraph/heading blocks - identifies exactly which
-  // paragraph an edit gets written back into. Table blocks are read-only.
-  paragraph_index?: number | null
 }
 
 export interface TemplateListResponse {
@@ -51,7 +37,6 @@ export interface TemplateListResponse {
   // Per-page HTML rendered directly from the .docx, independent of
   // LibreOffice/soffice. Used as a fallback when page_images[i] is missing.
   page_html?: string[]
-  static_blocks?: StaticBlock[]
 }
 
 export interface PendingTemplateResponse extends TemplateListResponse {
@@ -66,7 +51,6 @@ export interface PendingTemplateUpdateRequest {
   description?: string | null
   specification_number?: string | null
   sections?: TemplateSection[]
-  static_blocks?: StaticBlock[]
 }
 
 export interface ProjectResponse {
@@ -113,20 +97,12 @@ export interface ExtractedFieldResponse {
   field_id: string
   field_label: string
   value?: string | null
-  // Immutable snapshot of what extraction originally produced, before any
-  // edit/approve/reject. Never changes after the field is created - lets
-  // the UI offer an "Undo" back to it.
-  original_value?: string | null
   confidence?: number | null
   validation_status: string
   // Result of comparing this value to the matched template's requirement
   // during "Verify Document & Template". Optional because it's only
   // populated after a verify pass has run for the job.
   verification_status?: VerificationStatus | null
-  // Static fields (locked template defaults, not extracted per-document)
-  // are filtered out of the editable field list using this - see
-  // ProjectDetail.tsx's staticFields/dynamicFields split.
-  is_dynamic?: boolean
   source_references: SourceReferenceResponse[]
 }
 
@@ -180,7 +156,6 @@ export interface FieldVerificationResponse {
   status: VerificationStatus
   expected_hint?: string | null
   reason?: string | null
-  required?: boolean
 }
 
 export interface CreateExtractionRequest {

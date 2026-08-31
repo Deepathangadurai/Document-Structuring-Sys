@@ -71,6 +71,14 @@ def get_extraction_results(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Extraction job not found")
     return extraction_service.get_job_results(job)
 
+@router.delete("/extraction/{job_id}")
+def delete_extraction(job_id: int, db: Session = Depends(get_db)):
+    project_service = ProjectService(db)
+    deleted = project_service.delete_extraction_job(job_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Extraction job not found")
+    return {"deleted": True}
+
 @router.get("/extraction/{job_id}/verify", response_model=list[FieldVerificationResponse])
 def verify_extraction(job_id: int, db: Session = Depends(get_db)):
     """Requirement #10: "Verify Document & Template" - compares every

@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card } from './ui'
 import { Icons } from './icons'
 import { getTemplate, getTemplates, listPendingTemplates, uploadTemplate } from '../services/api'
-import type { TemplateField, TemplateListResponse } from '../types'
+import type { TemplateListResponse } from '../types'
 
 function countFields(template: TemplateListResponse): { fields: number; sections: number } {
   const sections = template.sections ?? []
@@ -15,13 +15,10 @@ export default function Templates() {
   const [templates, setTemplates] = useState<TemplateListResponse[]>([])
   const [selected, setSelected] = useState<TemplateListResponse | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [previewPage, setPreviewPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [awaitingServer, setAwaitingServer] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const navigate = useNavigate()
@@ -59,14 +56,9 @@ export default function Templates() {
     e.target.value = ''
     if (!file) return
     setUploading(true)
-    setUploadProgress(0)
-    setAwaitingServer(false)
     setUploadError(null)
     try {
-      const pending = await uploadTemplate(file, (percent) => {
-        setUploadProgress(percent)
-        if (percent >= 100) setAwaitingServer(true)
-      })
+      const pending = await uploadTemplate(file)
       // New uploads start as draft - take user directly to page-by-page review
       // so they can immediately validate and finalize the master template
       navigate(`/templates/pending/${pending.id}/review`)
@@ -74,8 +66,6 @@ export default function Templates() {
       setUploadError(`Could not upload template: ${(err as Error).message}`)
     } finally {
       setUploading(false)
-      setUploadProgress(0)
-      setAwaitingServer(false)
     }
   }
 
@@ -83,25 +73,11 @@ export default function Templates() {
     try {
       const fresh = await getTemplate(templateId)
       setSelected(fresh)
-      setPreviewPage(0)
       setPreviewOpen(true)
     } catch (err) {
       setError(`Could not load template preview: ${(err as Error).message}`)
     }
   }
-
-  // field_id -> field + its section name, flattened across all sections,
-  // so a page's data-field-id list can be resolved to full field info in
-  // one lookup instead of re-scanning selected.sections per page.
-  const fieldLookup = useMemo(() => {
-    const map: Record<string, { field: TemplateField; sectionName: string }> = {}
-    for (const section of selected?.sections ?? []) {
-      for (const field of section.fields) {
-        map[field.field_id] = { field, sectionName: section.section_name }
-      }
-    }
-    return map
-  }, [selected])
 
   return (
     <div className="p-8 max-w-7xl mx-auto overflow-y-auto h-full pb-20">
@@ -117,20 +93,8 @@ export default function Templates() {
           <input ref={fileInputRef} type="file" accept=".doc,.docx" className="hidden" onChange={handleFileChosen} />
           <Button variant="primary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
             <Icons.Upload className="w-4 h-4" />
-            {!uploading
-              ? 'Upload template'
-              : awaitingServer
-                ? 'Processing on server...'
-                : `Uploading... ${uploadProgress}%`}
+            {uploading ? 'Uploading...' : 'Upload template'}
           </Button>
-          {uploading ? (
-            <div className="w-48 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-              <div
-                className={`h-1.5 rounded-full bg-brand ${awaitingServer ? 'animate-pulse' : 'transition-all duration-150'}`}
-                style={{ width: awaitingServer ? '100%' : `${uploadProgress}%` }}
-              />
-            </div>
-          ) : null}
           {pendingCount > 0 ? (
             <Link to="/templates/pending" className="text-sm text-amber-700 hover:underline">
               {pendingCount} awaiting review &rarr;
@@ -155,8 +119,9 @@ export default function Templates() {
               return (
                 <Card
                   key={t.template_id}
-                  className={`p-5 cursor-pointer transition-all ${isSelected ? 'ring-2 ring-brand border-brand' : 'hover:border-slate-300'
-                    }`}
+                  className={`p-5 cursor-pointer transition-all ${
+                    isSelected ? 'ring-2 ring-brand border-brand' : 'hover:border-slate-300'
+                  }`}
                 >
                   <div>
                     <div className="flex justify-between items-start mb-3">
@@ -238,145 +203,27 @@ export default function Templates() {
 
               <div className="mt-6 border border-slate-200 rounded-md bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Template preview</p>
-                {selected.page_html && selected.page_html.length > 0 ? (
-                  // One page at a time: the current page's rendered content,
-                  // with only the dynamic fields tagged on that page below
-                  // it (matched via the same data-field-id spans the
-                  // extraction-review screen uses) - plus prev/next to move
-                  // through the rest of the document.
-                  (() => {
-                    const pages = selected.page_html!
-                    const pageIdx = Math.min(previewPage, pages.length - 1)
-                    const html = pages[pageIdx]
-                    const ids = new Set<string>()
-                    const regex = /data-field-id="([^"]+)"/g
-                    let m: RegExpExecArray | null
-                    while ((m = regex.exec(html))) ids.add(m[1])
-                    const fieldsOnThisPage = Array.from(ids)
-                      .map((id) => fieldLookup[id])
-                      .filter(Boolean) as { field: TemplateField; sectionName: string }[]
-                    const imagePath = selected.page_images?.[pageIdx]
-
-                    return (
-                      <div className="border border-slate-200 rounded-md bg-white overflow-hidden">
-                        <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
-                          <button
-                            type="button"
-                            onClick={() => setPreviewPage((p) => Math.max(0, p - 1))}
-                            disabled={pageIdx <= 0}
-                            className="px-2 py-1 text-xs font-semibold text-slate-600 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
-                          >
-                            &larr; Prev
-                          </button>
-                          <span className="text-xs font-semibold text-slate-500">
-                            Page {pageIdx + 1} of {pages.length}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setPreviewPage((p) => Math.min(pages.length - 1, p + 1))}
-                            disabled={pageIdx >= pages.length - 1}
-                            className="px-2 py-1 text-xs font-semibold text-slate-600 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
-                          >
-                            Next &rarr;
-                          </button>
-                        </div>
-
-                        {imagePath ? (
-                          <div className="bg-slate-900 flex justify-center py-4">
-                            <img
-                              src={imagePath}
-                              alt={`Preview of ${selected.template_name} page ${pageIdx + 1}`}
-                              style={{ maxWidth: '100%', height: 'auto', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}
-                              className="border border-slate-300"
-                            />
-                          </div>
-                        ) : (
-                          <div
-                            className="p-4 text-sm leading-6 max-h-[420px] overflow-auto"
-                            dangerouslySetInnerHTML={{ __html: html }}
-                          />
-                        )}
-
-                        <div className="p-4 border-t border-slate-200">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                            Dynamic values on this page
-                          </p>
-                          {fieldsOnThisPage.length > 0 ? (
-                            <ul className="space-y-1.5">
-                              {fieldsOnThisPage.map(({ field, sectionName }) => {
-                                const isDynamic = field.is_dynamic !== false
-                                return (
-                                  <li key={field.field_id} className="flex items-center justify-between text-sm gap-2">
-                                    <span className="text-slate-700 flex-1">
-                                      {field.field_label}
-                                      <span className="text-slate-400 text-xs ml-1">({sectionName})</span>
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                      <span
-                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${isDynamic
-                                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                            : 'bg-slate-100 text-slate-500 border-slate-200'
-                                          }`}
-                                        title={isDynamic ? 'Dynamic — extracted from source document' : 'Static — fixed boilerplate text'}
-                                      >
-                                        <span className={`w-1.5 h-1.5 rounded-full inline-block ${isDynamic ? 'bg-blue-500' : 'bg-slate-400'}`} />
-                                        {isDynamic ? 'Dynamic' : 'Static'}
-                                      </span>
-                                      <span className={field.required ? 'text-slate-500 text-xs' : 'text-slate-400 text-xs'}>
-                                        {field.required ? 'required' : 'optional'}
-                                      </span>
-                                    </span>
-                                  </li>
-                                )
-                              })}
-                            </ul>
-                          ) : (
-                            <p className="text-xs text-slate-400">No dynamic fields tagged on this page.</p>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })()
-                ) : selected.page_images && selected.page_images.length > 0 ? (
-                  // No page_html to derive per-page fields from - fall back
-                  // to one page image at a time with the full field list below.
-                  (() => {
-                    const images = selected.page_images!
-                    const pageIdx = Math.min(previewPage, images.length - 1)
-                    return (
-                      <div className="border border-slate-200 rounded-md bg-white overflow-hidden">
-                        <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
-                          <button
-                            type="button"
-                            onClick={() => setPreviewPage((p) => Math.max(0, p - 1))}
-                            disabled={pageIdx <= 0}
-                            className="px-2 py-1 text-xs font-semibold text-slate-600 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
-                          >
-                            &larr; Prev
-                          </button>
-                          <span className="text-xs font-semibold text-slate-500">
-                            Page {pageIdx + 1} of {images.length}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setPreviewPage((p) => Math.min(images.length - 1, p + 1))}
-                            disabled={pageIdx >= images.length - 1}
-                            className="px-2 py-1 text-xs font-semibold text-slate-600 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent"
-                          >
-                            Next &rarr;
-                          </button>
-                        </div>
-                        <div className="bg-slate-900 flex justify-center py-4">
+                {selected.page_images && selected.page_images.length > 0 ? (
+                  <div className="border border-slate-200 bg-slate-900 rounded-md overflow-y-auto" style={{ maxHeight: '700px' }}>
+                    <div className="flex flex-col items-center py-4">
+                      {selected.page_images.slice(0, 1).map((imagePath: string, idx: number) => (
+                        <div key={`${selected.template_id}-preview-${idx}`} className="w-full flex flex-col items-center">
+                          <div className="mb-2 text-xs text-slate-400">Page {idx + 1}</div>
                           <img
-                            src={images[pageIdx]}
-                            alt={`Preview of ${selected.template_name} page ${pageIdx + 1}`}
+                            src={imagePath}
+                            alt={`Preview of ${selected.template_name}`}
                             style={{ maxWidth: '100%', height: 'auto', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}
                             className="border border-slate-300"
                           />
                         </div>
-                      </div>
-                    )
-                  })()
+                      ))}
+                    </div>
+                  </div>
+                ) : selected.page_html && selected.page_html.length > 0 ? (
+                  <div
+                    className="max-h-[420px] overflow-auto border border-slate-200 bg-white p-4 rounded-md text-sm leading-6"
+                    dangerouslySetInnerHTML={{ __html: selected.page_html[0] }}
+                  />
                 ) : selected.preview_html ? (
                   <div
                     className="max-h-[420px] overflow-auto border border-slate-200 bg-white p-4 rounded-md text-sm leading-6"
@@ -387,45 +234,25 @@ export default function Templates() {
                 )}
               </div>
 
-              {/* Full field list (all pages combined) - only needed as a
-                  fallback when page_html isn't available to derive the
-                  per-page breakdown above. */}
-              {!(selected.page_html && selected.page_html.length > 0) && (
-                <div className="mt-6 space-y-6">
-                  {(selected.sections ?? []).map((section) => (
-                    <div key={section.section_id}>
-                      <h3 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2 mb-3 uppercase tracking-wide">
-                        {section.section_name}
-                      </h3>
-                      <ul className="space-y-1.5">
-                        {section.fields.map((field) => {
-                          const isDynamic = field.is_dynamic !== false
-                          return (
-                            <li key={field.field_id} className="flex items-center justify-between text-sm gap-2">
-                              <span className="text-slate-700 flex-1">{field.field_label}</span>
-                              <span className="flex items-center gap-1.5">
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${isDynamic
-                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                      : 'bg-slate-100 text-slate-500 border-slate-200'
-                                    }`}
-                                  title={isDynamic ? 'Dynamic — extracted from source document' : 'Static — fixed boilerplate text'}
-                                >
-                                  <span className={`w-1.5 h-1.5 rounded-full inline-block ${isDynamic ? 'bg-blue-500' : 'bg-slate-400'}`} />
-                                  {isDynamic ? 'Dynamic' : 'Static'}
-                                </span>
-                                <span className={field.required ? 'text-slate-500 text-xs' : 'text-slate-400 text-xs'}>
-                                  {field.required ? 'required' : 'optional'}
-                                </span>
-                              </span>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="mt-6 space-y-6">
+                {(selected.sections ?? []).map((section) => (
+                  <div key={section.section_id}>
+                    <h3 className="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2 mb-3 uppercase tracking-wide">
+                      {section.section_name}
+                    </h3>
+                    <ul className="space-y-1.5">
+                      {section.fields.map((field) => (
+                        <li key={field.field_id} className="flex items-center justify-between text-sm">
+                          <span className="text-slate-700">{field.field_label}</span>
+                          <span className={field.required ? 'text-slate-500' : 'text-slate-400'}>
+                            {field.required ? 'required' : 'optional'}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

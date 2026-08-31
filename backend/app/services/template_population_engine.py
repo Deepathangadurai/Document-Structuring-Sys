@@ -23,7 +23,8 @@ Workflow:
 import logging
 from pathlib import Path
 from typing import Any
-from docx import Document as DocxDocument
+import docx
+from docx.document import Document as DocxDocument
 from docx.text.paragraph import Paragraph  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
@@ -126,7 +127,7 @@ class TemplatePopulationEngine:
         
         try:
             # Load template
-            doc = DocxDocument(str(self.template_path))
+            doc = docx.Document(str(self.template_path))
         except Exception as e:
             report["errors"].append(f"Failed to load template: {e}")
             return False, report

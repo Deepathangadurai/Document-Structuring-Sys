@@ -38,48 +38,6 @@ async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T> {
   return handleResponse<T>(await fetch(url, { cache: 'no-store', ...init }))
 }
 
-// fetch() has no way to observe upload progress in the browser - only
-// download/response progress via streaming the response body. XHR is the
-// only option that exposes `upload.onprogress`, so file uploads that need
-// a progress bar go through this instead of fetchJson.
-function uploadWithProgress<T>(
-  url: string,
-  form: FormData,
-  onProgress?: (percent: number) => void,
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', url)
-
-    xhr.upload.onprogress = (event) => {
-      if (!onProgress || !event.lengthComputable) return
-      onProgress(Math.round((event.loaded / event.total) * 100))
-    }
-
-    xhr.onload = () => {
-      let body: unknown = undefined
-      try {
-        body = xhr.responseText ? JSON.parse(xhr.responseText) : undefined
-      } catch {
-        // response wasn't JSON
-      }
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress?.(100)
-        resolve(body as T)
-      } else {
-        const detail = (body as { detail?: unknown } | undefined)?.detail
-        const message = detail ? (typeof detail === 'string' ? detail : JSON.stringify(detail)) : xhr.statusText
-        reject(new Error(message || `Upload failed with status ${xhr.status}`))
-      }
-    }
-
-    xhr.onerror = () => reject(new Error('Upload failed - could not reach the server.'))
-    xhr.onabort = () => reject(new Error('Upload cancelled.'))
-
-    xhr.send(form)
-  })
-}
-
 // ---- Templates ----
 
 export async function getTemplates(): Promise<TemplateListResponse[]> {
@@ -100,13 +58,16 @@ export async function getPendingTemplate(id: number): Promise<PendingTemplateRes
   return fetchJson(`${API_BASE}/templates/pending/${id}`)
 }
 
-export async function uploadTemplate(
-  file: File,
-  onProgress?: (percent: number) => void,
-): Promise<PendingTemplateResponse> {
+export async function uploadTemplate(file: File): Promise<PendingTemplateResponse> {
   const form = new FormData()
   form.append('file', file)
-  return uploadWithProgress(`${API_BASE}/templates/upload`, form, onProgress)
+  return handleResponse(
+    await fetch(`${API_BASE}/templates/upload`, {
+      method: 'POST',
+      cache: 'no-store',
+      body: form,
+    }),
+  )
 }
 
 export async function updatePendingTemplate(
@@ -157,14 +118,15 @@ export async function createProject(payload: CreateProjectRequest): Promise<Proj
 
 // ---- Documents ----
 
-export async function uploadDocument(
-  projectId: number,
-  file: File,
-  onProgress?: (percent: number) => void,
-): Promise<DocumentMetadataResponse> {
+export async function uploadDocument(projectId: number, file: File): Promise<DocumentMetadataResponse> {
   const form = new FormData()
   form.append('file', file)
-  return uploadWithProgress(`${API_BASE}/projects/${projectId}/documents`, form, onProgress)
+  return handleResponse(
+    await fetch(`${API_BASE}/projects/${projectId}/documents`, {
+      method: 'POST',
+      body: form,
+    }),
+  )
 }
 
 export async function listProjectDocuments(projectId: number): Promise<DocumentMetadataResponse[]> {

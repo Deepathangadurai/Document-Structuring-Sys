@@ -123,3 +123,22 @@ body {
   background: #f0fdf4;
   outline-color: #22c55e;
 }
+
+/* Active focus / selected highlight when clicked from sidebar */
+.tpl-field-highlighted {
+  background: #fef08a !important;
+  outline: 2.5px solid #2563eb !important;
+  outline-offset: 2px !important;
+  border-radius: 3px !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25) !important;
+  animation: field-glow 1.5s ease-in-out infinite alternate !important;
+}
+
+@keyframes field-glow {
+  0% {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.15);
+  }
+}

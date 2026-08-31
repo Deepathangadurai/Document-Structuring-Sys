@@ -1,7 +1,9 @@
 import json
 import logging
+import shutil
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional, Any, cast
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -88,6 +90,114 @@ class ProjectService:
 
     def get_document(self, document_id: int) -> Optional[Document]:
         return self.db.query(Document).filter_by(id=document_id).first()
+
+    def delete_project(self, project_id: int) -> bool:
+        """Delete a project and everything that hangs off it: documents (+
+        their page rows and on-disk files), extraction jobs, extracted
+        fields, and source references. No relationship here has an ORM or
+        DB-level cascade configured (see models.py), so this deletes in
+        explicit child-to-parent order rather than relying on one implicit
+        cascading DELETE - the FK constraints would otherwise reject
+        deleting a Project that still has rows referencing it.
+
+        Every delete below is a bulk query.delete(), including the Project
+        row itself, deliberately - not self.db.delete(project). Mixing the
+        two matters here: once project.documents is accessed (to collect
+        file paths), those Document objects are tracked in the session's
+        identity map. self.db.delete(project) on an ORM object triggers
+        SQLAlchemy's default relationship handling, which tries to UPDATE
+        each tracked child to null out its FK - but those rows were
+        already removed by the bulk deletes below (synchronize_session=
+        False doesn't update the identity map), so that UPDATE hits zero
+        rows and raises StaleDataError. Using query(Project).delete() for
+        the parent too avoids ever touching the ORM-tracked children.
+        """
+        project = self.db.query(Project).filter_by(id=project_id).first()
+        if not project:
+            return False
+
+        # Snapshot what's needed for on-disk cleanup from plain queries
+        # (not the ORM relationship) before anything is deleted, for the
+        # same reason described above.
+        documents = self.db.query(Document.id, Document.stored_filename).filter_by(project_id=project_id).all()
+        document_ids = [d.id for d in documents]
+        job_ids = [
+            j.id for j in self.db.query(ExtractionJob.id).filter_by(project_id=project_id).all()
+        ]
+
+        if job_ids:
+            field_ids = [
+                f.id for f in
+                self.db.query(ExtractedField.id).filter(ExtractedField.extraction_job_id.in_(job_ids)).all()
+            ]
+            if field_ids:
+                self.db.query(SourceReference).filter(
+                    SourceReference.extracted_field_id.in_(field_ids)
+                ).delete(synchronize_session=False)
+            self.db.query(ExtractedField).filter(
+                ExtractedField.extraction_job_id.in_(job_ids)
+            ).delete(synchronize_session=False)
+            self.db.query(ExtractionJob).filter(
+                ExtractionJob.id.in_(job_ids)
+            ).delete(synchronize_session=False)
+
+        if document_ids:
+            self.db.query(DocumentPage).filter(
+                DocumentPage.document_id.in_(document_ids)
+            ).delete(synchronize_session=False)
+
+        # Files on disk (original upload + rendered page images) are only
+        # removed after the DB rows commit successfully below - deleting
+        # the DB record but leaving orphaned files is recoverable (disk
+        # space wasted), but the reverse (files gone, DB delete fails,
+        # project still "exists" pointing at nothing) is not.
+        document_service = DocumentService(self.db)
+        file_paths_to_remove: list[Path] = []
+        for doc_id, stored_filename in documents:
+            if stored_filename:
+                file_paths_to_remove.append(document_service.originals_path / stored_filename)
+            file_paths_to_remove.append(document_service.pages_path / str(doc_id))
+
+        self.db.query(Document).filter(Document.project_id == project_id).delete(synchronize_session=False)
+        self.db.query(Project).filter(Project.id == project_id).delete(synchronize_session=False)
+        self.db.commit()
+
+        for path in file_paths_to_remove:
+            try:
+                if path.is_dir():
+                    shutil.rmtree(path, ignore_errors=True)
+                elif path.exists():
+                    path.unlink()
+            except OSError:
+                logger.warning("Could not remove file while deleting project %s: %s", project_id, path)
+
+        return True
+
+    def delete_extraction_job(self, job_id: int) -> bool:
+        """Delete a single specification's extraction results from a
+        project, without touching the project, its document, or any other
+        specification's job - the narrower alternative to delete_project
+        for the common case of "I don't need this one template's results
+        anymore" (e.g. to free up a template that's otherwise blocked from
+        deletion by a project that's still very much in use)."""
+        job = self.db.query(ExtractionJob).filter_by(id=job_id).first()
+        if not job:
+            return False
+
+        field_ids = [
+            f.id for f in
+            self.db.query(ExtractedField.id).filter(ExtractedField.extraction_job_id == job_id).all()
+        ]
+        if field_ids:
+            self.db.query(SourceReference).filter(
+                SourceReference.extracted_field_id.in_(field_ids)
+            ).delete(synchronize_session=False)
+        self.db.query(ExtractedField).filter(
+            ExtractedField.extraction_job_id == job_id
+        ).delete(synchronize_session=False)
+        self.db.query(ExtractionJob).filter(ExtractionJob.id == job_id).delete(synchronize_session=False)
+        self.db.commit()
+        return True
 
     def _to_response(
         self,

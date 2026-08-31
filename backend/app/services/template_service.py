@@ -1,11 +1,13 @@
 import json
 import re
+import shutil
 import time
 from pathlib import Path
 from typing import Any, cast
 from uuid import uuid4
 from sqlalchemy.orm import Session
-from app.db.models import Template
+from sqlalchemy.orm.attributes import flag_modified
+from app.db.models import Template, Project, ExtractionJob, ExtractedField, SourceReference
 from app.core.config import settings
 from app.services.schema_inference import (
     infer_schema_sections_with_page_count,
@@ -150,10 +152,9 @@ class TemplateService:
                 # BUG (root cause of tables disappearing from already-synced
                 # templates): schema.json on disk is deploy-time seed data
                 # and never carries the heavy, computed-at-parse-time keys
-                # (sections with their per-row table field_ids, page_html
-                # with its data-field-id table markup, page_images,
-                # preview_html, document_sections, text_preview) - those
-                # only ever get produced once, by
+                # (page_html with its data-field-id table markup,
+                # page_images, preview_html, document_sections,
+                # text_preview) - those only ever get produced once, by
                 # infer_schema_sections_with_page_count(), either the first
                 # time a brand-new template folder is synced (see the
                 # `else` branch below) or via the pending-review/finalize
@@ -164,38 +165,28 @@ class TemplateService:
                 # restart, since sync runs on a TTL). Once erased, every
                 # page for that template silently fell back to plain text
                 # rendering with no tables and no editable spans, and there
-                # was no way to get them back short of re-uploading.
-                #
-                # `sections` specifically was NOT in the original protected
-                # list, which was its own bug: schema.json's `sections`
-                # stub is a truthy (non-empty) value even when it's just a
-                # handful of placeholder cover-page fields, so the old
-                # `if not schema.get(computed_key)` guard never fired for
-                # it - disk's stub always won. That meant `page_html` could
-                # correctly keep showing a fully-structured page (tables,
-                # multi-section layout) while `sections` - the field list
-                # that actually drives what the extraction model is told to
-                # look for, and what "Values on This Page" matches against
-                # - kept getting silently reset to the seed stub on every
-                # restart. Result: boxes render on the page (from the
-                # preserved page_html) but nothing ever populates or saves
-                # into them, because as far as extraction is concerned
-                # those fields don't exist. Once a template has real
-                # DB-computed content for any of these keys, prefer it
-                # unconditionally over disk - disk only gets to seed a
-                # brand-new template (the `else` branch), never to shrink
-                # an existing one back down.
+                # was no way to get them back short of re-uploading. Merge
+                # instead: only let the file take precedence for keys it
+                # actually declares (real content edits like `sections`
+                # should still apply), and keep whatever the DB already
+                # computed for anything the file is silent on.
                 existing_schema = getattr(template, "schema")
                 existing_schema = existing_schema if isinstance(existing_schema, dict) else {}
                 merged_schema = {**existing_schema, **schema}
                 for computed_key in (
-                    "sections", "page_html", "page_images", "preview_html",
+                    "page_html", "page_images", "preview_html",
                     "document_sections", "text_preview", "static_blocks",
                 ):
-                    if existing_schema.get(computed_key):
+                    if not schema.get(computed_key) and existing_schema.get(computed_key):
                         merged_schema[computed_key] = existing_schema[computed_key]
                 if merged_schema != existing_schema:
                     setattr(template, "schema", merged_schema)
+                    # flag_modified is required because SQLAlchemy's JSON
+                    # column tracking may not detect a nested-dict change
+                    # even when a new dict object is assigned - without it,
+                    # the session silently skips the UPDATE and the new
+                    # sections from schema.json never reach the DB.
+                    flag_modified(template, "schema")
                     updated = True
                 if getattr(template, "structure_locked") != structure_locked_val:
                     setattr(template, "structure_locked", structure_locked_val)
@@ -204,11 +195,29 @@ class TemplateService:
                     self.db.add(template)
                 seen_template_ids.add(template_id)
             else:
-                # A template folder that's never been seen before. Don't
-                # trust schema.json's (often placeholder) field list or
-                # auto-activate it - run the same real-document extraction
-                # used for uploads and drop it into Pending Review so a
-                # human validates it before it can be used by a project.
+                # A template folder that's never been seen before. Normally
+                # don't trust schema.json's (often placeholder) field list -
+                # run the same real-document extraction used for uploads and
+                # drop it into Pending Review so a human validates it before
+                # it can be used by a project.
+                #
+                # EXCEPT: structure_locked=true is the schema.json author
+                # explicitly saying "I've already hand-curated this
+                # structure - don't touch it." That flag was being read
+                # into structure_locked_val above and stored on the row,
+                # but never actually CHECKED anywhere - a write-only flag
+                # that did nothing. In practice this meant: re-add a
+                # template (e.g. after deleting it, or on a fresh deploy)
+                # whose schema.json was hand-edited into a rich, correct
+                # section/field structure, and this branch would silently
+                # discard all of that and regenerate a naive structure from
+                # the raw .doc/.docx instead - which is exactly what "even
+                # after updating schema.json, pending shows the old
+                # document structure" was. When structure_locked is true,
+                # schema.json's own `sections` are kept as the source of
+                # truth; only the rendering artifacts (page_html/images/
+                # preview) still come from parsing the real document, since
+                # those are needed to actually display it.
                 source_path = self._find_source_document(child, file_name_val)
                 sections = schema.get("sections", [])
                 text_preview = None
@@ -221,9 +230,12 @@ class TemplateService:
                 if source_path is not None:
                     try:
                         images_output_dir = self.pending_storage_path / f"{template_id}" / "pages"
-                        sections, text_preview, page_count, preview_html, page_images, page_html, static_blocks = infer_schema_sections_with_page_count(
-                            source_path, images_output_dir
-                        )
+                        (
+                            inferred_sections, text_preview, page_count, preview_html,
+                            page_images, page_html, static_blocks,
+                        ) = infer_schema_sections_with_page_count(source_path, images_output_dir)
+                        if not structure_locked_val:
+                            sections = inferred_sections
                         document_sections = get_document_sections_for_display(source_path)
                     except Exception:
                         pass  # fall back to whatever schema.json declared
@@ -280,6 +292,98 @@ class TemplateService:
     def get_template_model(self, template_id: str) -> Template | None:
         self.sync_templates_if_needed()
         return self.db.query(Template).filter_by(template_id=template_id, is_active=True).first()
+
+    def delete_template(self, template_id: str, force: bool = False) -> None:
+        """Hard-delete an active master template. Raises ValueError (the
+        API layer turns this into a 400) if any project, or any extraction
+        job belonging to a project that's still alive, references it -
+        deleting it out from under them would break their template_id
+        foreign key and their ability to load at all - UNLESS force=True,
+        in which case those blocking jobs (and their fields/source refs)
+        are deleted right along with the template. force never touches the
+        projects themselves or their other specifications' jobs - only the
+        job(s) that were specifically blocking THIS template's deletion.
+
+        Project.template_id is NOT the signal to check for "is this
+        template in use" - see its own comment in models.py: it's
+        "nullable and mostly vestigial" now that a project is matched to
+        templates via detected specifications (one ExtractionJob per
+        matched spec) rather than one template up front. A project can
+        easily have Project.template_id pointing at nothing while still
+        holding a real, live ExtractionJob against this template - so the
+        actual signal is entirely "does a live project have a job that
+        used this template," not the Project.template_id column.
+
+        SQLite here doesn't enforce foreign keys (no PRAGMA foreign_keys=ON
+        in database.py), so an ExtractionJob can exist pointing at a
+        project_id that no longer exists - e.g. left behind by a project
+        deleted before delete_project's cascade logic existed. Blocking on
+        the raw count of jobs referencing this template treated that dead
+        history as if it were live data, permanently refusing to delete a
+        template that nothing actually depends on anymore. Only jobs whose
+        project still exists count toward the block; orphaned jobs (and
+        their fields/source references) are cleaned up here regardless of
+        force, since nothing would actually break by removing them.
+
+        Deleting only the DB row is not enough: sync_templates() treats
+        any template_id folder under TEMPLATE_PATH that ISN'T already in
+        the DB as a brand-new upload and re-adds it (as pending) on the
+        very next sync cycle. The on-disk folder is removed too so a
+        deleted template actually stays deleted instead of quietly
+        reappearing within _SYNC_TTL_SECONDS.
+        """
+        template = self.db.query(Template).filter_by(template_id=template_id).first()
+        if not template:
+            raise ValueError("Template not found")
+
+        live_project_rows = self.db.query(Project.id, Project.project_name).all()
+        live_project_names = {row[0]: row[1] for row in live_project_rows}
+        jobs = self.db.query(ExtractionJob).filter_by(template_id=template.id).all()
+        live_jobs = [j for j in jobs if j.project_id in live_project_names]
+        orphaned_job_ids = [j.id for j in jobs if j.project_id not in live_project_names]
+
+        if live_jobs and not force:
+            # Name the actual project(s) rather than just a count, so
+            # there's something to act on instead of a number to guess
+            # about - go look at THIS project, not "some project somewhere."
+            blocking_projects = sorted({live_project_names[j.project_id] for j in live_jobs})
+            names = ", ".join(f'"{n}"' for n in blocking_projects)
+            raise ValueError(
+                f"Cannot delete '{template_id}': {len(live_jobs)} extraction job(s) in project(s) "
+                f"{names} still use it. Delete those projects (or just that project's extraction "
+                f"results for this template), or force-delete this template to remove those "
+                f"job(s)' results along with it."
+            )
+
+        jobs_to_clean_up = orphaned_job_ids + ([j.id for j in live_jobs] if force else [])
+        if jobs_to_clean_up:
+            field_ids = [
+                f.id for f in
+                self.db.query(ExtractedField.id).filter(ExtractedField.extraction_job_id.in_(jobs_to_clean_up)).all()
+            ]
+            if field_ids:
+                self.db.query(SourceReference).filter(
+                    SourceReference.extracted_field_id.in_(field_ids)
+                ).delete(synchronize_session=False)
+            self.db.query(ExtractedField).filter(
+                ExtractedField.extraction_job_id.in_(jobs_to_clean_up)
+            ).delete(synchronize_session=False)
+            self.db.query(ExtractionJob).filter(
+                ExtractionJob.id.in_(jobs_to_clean_up)
+            ).delete(synchronize_session=False)
+
+        folder = self.template_base_path / template_id
+        self.db.delete(template)
+        self.db.commit()
+
+        if folder.exists() and folder.is_dir():
+            try:
+                shutil.rmtree(folder)
+            except OSError:
+                pass  # DB row is already gone; a leftover folder will just look like an unsynced upload
+
+        global _last_seen_mtime_signature
+        _last_seen_mtime_signature = None  # force a full resync on the next request, not a stale 30s-cached view
 
     def _to_response(self, template: Template) -> dict[str, Any]:
         schema_attr = getattr(template, "schema")

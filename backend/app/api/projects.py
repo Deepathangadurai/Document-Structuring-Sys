@@ -1,3 +1,4 @@
+from typing import Any, cast
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
@@ -43,6 +44,15 @@ def get_project(project_id: int, db: Session = Depends(get_db)):
     return project_detail
 
 
+@router.delete("/projects/{project_id}")
+def delete_project(project_id: int, db: Session = Depends(get_db)):
+    project_service = ProjectService(db)
+    deleted = project_service.delete_project(project_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"deleted": True}
+
+
 @router.post("/projects/{project_id}/detect-specifications", response_model=list[DetectedSpecificationResponse])
 def detect_specifications(project_id: int, db: Session = Depends(get_db)):
     """Step 6/7 of the workflow: scan the project's uploaded source document
@@ -59,7 +69,7 @@ def detect_specifications(project_id: int, db: Session = Depends(get_db)):
     # Most recently uploaded document — a project has exactly one source
     # document in the current workflow, but this stays correct if that
     # ever changes.
-    document = max(project.documents, key=lambda d: d.id)
+    document = max(cast(list[Any], project.documents), key=lambda d: d.id)
     if document.upload_status not in ("processed",):
         raise HTTPException(
             status_code=400,

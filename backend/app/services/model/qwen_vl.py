@@ -65,7 +65,7 @@ class QwenVLProvider(ModelProvider):
     def _truncate_text(value: str | None, max_chars: int) -> str:
         if value is None:
             return ""
-        text = str(value)
+        text = value
         if len(text) <= max_chars:
             return text
         return text[:max_chars].rstrip() + "\n...[truncated]"
@@ -462,9 +462,9 @@ class QwenVLProvider(ModelProvider):
             loop = None
 
         if loop and loop.is_running():
-            import nest_asyncio
-            nest_asyncio.apply()
-            return loop.run_until_complete(self.extract_async(template_schema, pages))
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                return executor.submit(asyncio.run, self.extract_async(template_schema, pages)).result()
         else:
             return asyncio.run(self.extract_async(template_schema, pages))
 

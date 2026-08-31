@@ -90,7 +90,8 @@ class PageAnalysisService:
         if not template:
             raise ValueError(f"Template {template_id} not found")
 
-        schema = template.schema or {}
+        schema_data = getattr(template, "schema")
+        schema: dict[str, Any] = schema_data if isinstance(schema_data, dict) else {}
         page_images = schema.get("page_images", [])
         total_pages = len(page_images)
 
@@ -134,7 +135,8 @@ class PageAnalysisService:
         if not template:
             raise ValueError(f"Template {template_id} not found")
 
-        schema = template.schema or {}
+        schema_data = getattr(template, "schema")
+        schema: dict[str, Any] = schema_data if isinstance(schema_data, dict) else {}
         fallback_page_text = build_page_text_from_fields(extracted_fields)
         normalized_page_text = page_text.strip() if isinstance(page_text, str) else ""
         if not normalized_page_text and fallback_page_text:
@@ -270,14 +272,14 @@ class PageAnalysisService:
         # final_schema is built client-side from the pending template
         # response and may be missing keys (page_images, page_html,
         # document_sections, ...) that were only ever computed server-side.
-        existing_schema = template.schema if isinstance(template.schema, dict) else {}
-        merged_schema = {**existing_schema, **final_schema}
+        existing_schema_raw = getattr(template, "schema")
+        existing_schema: dict[str, Any] = existing_schema_raw if isinstance(existing_schema_raw, dict) else {}
+        merged_schema: dict[str, Any] = {**existing_schema, **final_schema}
         for key in ("page_images", "page_html", "document_sections", "text_preview", "preview_html", "sections"):
             if not merged_schema.get(key) and existing_schema.get(key):
                 merged_schema[key] = existing_schema[key]
 
-        template.schema = merged_schema
-        template.validation_complete = True
+        setattr(template, "schema", merged_schema)
         self.db.add(template)
         self.db.commit()
 
@@ -304,7 +306,8 @@ class PageAnalysisService:
         if not template:
             raise ValueError(f"Template {template_id} not found")
 
-        schema = template.schema or {}
+        schema_data = getattr(template, "schema")
+        schema: dict[str, Any] = schema_data if isinstance(schema_data, dict) else {}
         page_images = schema.get("page_images") or []
         page_html_list = schema.get("page_html") or []
         total_pages = max(len(page_images), len(page_html_list), int(schema.get("page_count") or 1), 1)
@@ -471,12 +474,13 @@ class PageAnalysisService:
         page_html: str,
         page_number: int,
     ) -> list[dict[str, Any]]:
-        """Match labels to the current page HTML when page metadata is missing.
+        """Match fields to the current page HTML accurately.
 
-        This keeps the review page dynamic: each preview request checks the
-        actual HTML for that page and only returns the fields whose labels
-        appear in that page's text, instead of reusing stale metadata from a
-        historical template record.
+        Uses:
+        1. Explicit data-field-id spans embedded in page_html.
+        2. Clause references (clause_ref) found on this page.
+        3. Cover-page isolation (cover fields only on page 1).
+        4. Exact label and value matching on page text.
         """
         if not page_html:
             return []
@@ -488,18 +492,58 @@ class PageAnalysisService:
             return text.strip().lower()
 
         plain_text = normalize(page_html)
+        raw_text = html_lib.unescape(re.sub(r"<[^>]+>", " ", page_html))
+
+        # Check for tagged data-field-id spans in page_html
+        tagged_field_ids = set(re.findall(r'data-field-id="([^"]+)"', page_html))
+
         matches: list[dict[str, Any]] = []
+        seen_field_ids: set[str] = set()
+
         for section in schema.get("sections", []):
-            section_text = normalize(section.get("section_name"))
             for field in section.get("fields", []):
-                label = str(field.get("field_label") or field.get("label") or field.get("field_name") or "").strip()
-                if not label:
+                fid = str(field.get("field_id") or "").strip()
+                if fid and fid in seen_field_ids:
                     continue
-                label_norm = normalize(label)
-                if label_norm in plain_text or section_text and label_norm in section_text:
+
+                cref = str(field.get("clause_ref") or "").strip()
+                label = str(field.get("field_label") or field.get("label") or field.get("field_name") or "").strip()
+                val = str(field.get("default_value") or field.get("value") or "").strip()
+
+                is_match = False
+
+                # 1. Match by tagged data-field-id in HTML (excluding cover header repeats on page > 1)
+                if fid and fid in tagged_field_ids:
+                    if page_number == 1 or cref.lower() not in {"cover", "0.0", "0"}:
+                        is_match = True
+
+                # 2. Cover page isolation
+                elif page_number == 1:
+                    if cref.lower() in {"cover", "0.0", "0"}:
+                        is_match = True
+                    elif label and label.lower() in plain_text and ("spec. no" in label.lower() or "project" in label.lower() or "client" in label.lower() or "description" in label.lower()):
+                        is_match = True
+
+                # 3. For page 2+, never match cover page fields
+                elif cref.lower() not in {"cover", "0.0", "0"}:
+                    if cref:
+                        # Match exact clause reference in raw text, e.g. \b4.5.10\b or \b2.2.1\b
+                        pattern = r'(?:^|[^\w.])' + re.escape(cref) + r'(?:$|[^\w.])'
+                        if re.search(pattern, raw_text):
+                            is_match = True
+
+                    # 4. If label and non-trivial default_value both appear on this page
+                    if not is_match and label and val and len(val) >= 3 and len(label) >= 4:
+                        if label.lower() in plain_text and val.lower() in plain_text:
+                            is_match = True
+
+                if is_match:
                     patched = dict(field)
                     patched["page_number"] = page_number
                     matches.append(patched)
+                    if fid:
+                        seen_field_ids.add(fid)
+
         return matches
 
     def _get_sections_for_fields(

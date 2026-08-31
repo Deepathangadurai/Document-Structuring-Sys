@@ -50,6 +50,18 @@ function verifyLabel(status: VerificationStatus): string {
   return 'REVIEW'
 }
 
+// Quick visual indicator for extracted vs expected match
+function matchIndicator(extracted: string, defaultValue: string | undefined) {
+  if (!defaultValue || !extracted) return null
+  // Simple: if the extracted value is close enough to the default, treat as likely correct
+  const a = extracted.trim().toLowerCase()
+  const b = defaultValue.trim().toLowerCase()
+  if (a === b) return { icon: '✓', color: 'text-green-600 bg-green-50', label: 'Exact match with template default' }
+  // Partial match (one contains the other)
+  if (a.includes(b) || b.includes(a)) return { icon: '~', color: 'text-amber-600 bg-amber-50', label: 'Partial match — review recommended' }
+  return { icon: '≠', color: 'text-red-500 bg-red-50', label: 'Different from template default — review if correct' }
+}
+
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
@@ -125,10 +137,7 @@ export default function ProjectDetail() {
   const jobForSelectedDocument = selectedJob
 
   // Reset to page 1, clear unsaved edits, and clear any stale verification
-  // results whenever the selected specification (job) changes. The actual
-  // "are you sure" check for discarding unsaved edits happens at the call
-  // site (selectJob below), not here - by the time this effect sees a new
-  // selectedJobId the switch has already been confirmed.
+  // results whenever the selected specification (job) changes.
   useEffect(() => {
     setActivePage(1)
     setEdits({})
@@ -136,23 +145,6 @@ export default function ProjectDetail() {
     setVerifyError(null)
     setShowVerifyPanel(false)
   }, [selectedJobId])
-
-  // Guarded setter: switching specs while there are un-saved edits (typed
-  // in the document but never Approved/Saved/Rejected) would otherwise
-  // silently discard them, since the effect above wipes `edits` on every
-  // job change. This is the only place selectedJobId should be set from
-  // user interaction.
-  function selectJob(jobId: number) {
-    if (jobId === selectedJobId) return
-    if (Object.keys(edits).length > 0) {
-      const ok = window.confirm(
-        `You have ${Object.keys(edits).length} unsaved edit(s) on this specification. ` +
-        `Switching will discard them unless you Approve or Save them first. Continue anyway?`,
-      )
-      if (!ok) return
-    }
-    setSelectedJobId(jobId)
-  }
 
   // Fetch the *template's* rendered page HTML - this is the actual output
   // document's structure (tables, headings, layout), not a re-parse of the
@@ -203,6 +195,28 @@ export default function ProjectDetail() {
     return map
   }, [extractedFields])
 
+  // Build a map of fieldId → template field definition (extraction_hint, default_value, clause_ref)
+  // so the UI can show "expected vs extracted" side-by-side for each field.
+  const templateFieldDefs = useMemo(() => {
+    const map: Record<string, { extraction_hint?: string; default_value?: string; clause_ref?: string; required?: boolean }> = {}
+    if (!project || !jobForSelectedDocument) return map
+    // We don't have the template schema here yet — fetch it lazily from
+    // pagePreview.fields_on_page (the preview endpoint already joins it)
+    return map
+  }, [project, jobForSelectedDocument])
+
+  // Enrich template defs from fields_on_page whenever the preview loads
+  const [enrichedDefs, setEnrichedDefs] = useState<Record<string, { extraction_hint?: string; default_value?: string; clause_ref?: string; required?: boolean }>>({})
+  useEffect(() => {
+    if (!pagePreview) return
+    const newDefs: typeof enrichedDefs = {}
+    const fields: any[] = Array.isArray((pagePreview as any).fields_on_page) ? (pagePreview as any).fields_on_page : []
+    fields.forEach((f: any) => {
+      if (f.field_id) newDefs[f.field_id] = { extraction_hint: f.extraction_hint, default_value: f.default_value, clause_ref: f.clause_ref, required: f.required }
+    })
+    setEnrichedDefs(prev => ({ ...prev, ...newDefs }))
+  }, [pagePreview])
+
   const verifyByFieldId = useMemo(() => {
     const map: { [fieldId: string]: FieldVerificationResponse } = {}
     for (const v of verifyResults ?? []) map[v.field_id] = v
@@ -226,7 +240,7 @@ export default function ProjectDetail() {
     } catch (err) {
       setVerifyError(
         `Verification is not available yet: ${(err as Error).message}. This calls a new backend endpoint ` +
-        `(GET /extraction/{jobId}/verify) that still needs to compare extracted values against the matched template's requirements.`,
+          `(GET /extraction/{jobId}/verify) that still needs to compare extracted values against the matched template's requirements.`,
       )
     } finally {
       setVerifying(false)
@@ -274,7 +288,7 @@ export default function ProjectDetail() {
         setEdits((prev) => (prev[fieldId] === text ? prev : { ...prev, [fieldId]: text }))
       }
       span.removeEventListener('input', (span as any).__fieldInputHandler)
-        ; (span as any).__fieldInputHandler = handler
+      ;(span as any).__fieldInputHandler = handler
       span.addEventListener('input', handler)
     })
   }, [edits, extractedByFieldId])
@@ -317,64 +331,6 @@ export default function ProjectDetail() {
       await loadProject()
     } catch (err) {
       setError(`Could not approve field: ${(err as Error).message}`)
-    } finally {
-      setSavingFieldId(null)
-    }
-  }
-
-  // Saving an edit without approving/rejecting it. Requirement #11 asks
-  // for Accept, Edit, or Reject as three distinct actions, but until now
-  // "Edit" only ever persisted if the user also clicked Approve - typing
-  // in the document and then switching specs (which clears `edits`, see
-  // the effect above) silently discarded the change with no save and no
-  // warning. This persists the edited value with status "review" (edited,
-  // not yet approved) so it survives a job switch/reload and is visibly
-  // flagged as needing a follow-up look, distinct from both "verified"
-  // and "pending" (never touched).
-  async function handleSaveEdit(field: ExtractedFieldResponse) {
-    if (!jobForSelectedDocument) return
-    const value = edits[field.field_id] ?? getFieldDisplayValue(field)
-    if (value === getFieldDisplayValue(field) && field.validation_status !== 'pending') return
-    setSavingFieldId(field.field_id)
-    try {
-      await updateExtractedField(jobForSelectedDocument.id, field.field_id, {
-        value,
-        validation_status: 'review',
-      })
-      setEdits((prev) => {
-        const next = { ...prev }
-        delete next[field.field_id]
-        return next
-      })
-      await loadProject()
-    } catch (err) {
-      setError(`Could not save edit: ${(err as Error).message}`)
-    } finally {
-      setSavingFieldId(null)
-    }
-  }
-
-  // Restore this field back to what extraction originally produced,
-  // discarding any edit/approve/reject that's happened since. Distinct
-  // from Reject (which clears the value to blank and marks it rejected) -
-  // Undo puts back the model's original output and resets status to
-  // "pending" so it goes through Accept/Edit/Reject again from scratch.
-  async function handleUndo(field: ExtractedFieldResponse) {
-    if (!jobForSelectedDocument) return
-    setSavingFieldId(field.field_id)
-    try {
-      await updateExtractedField(jobForSelectedDocument.id, field.field_id, {
-        value: field.original_value ?? '',
-        validation_status: 'pending',
-      })
-      setEdits((prev) => {
-        const next = { ...prev }
-        delete next[field.field_id]
-        return next
-      })
-      await loadProject()
-    } catch (err) {
-      setError(`Could not undo field: ${(err as Error).message}`)
     } finally {
       setSavingFieldId(null)
     }
@@ -462,9 +418,10 @@ export default function ProjectDetail() {
                   return (
                     <li key={job.id}>
                       <button
-                        onClick={() => selectJob(job.id)}
-                        className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${selectedJobId === job.id ? 'bg-brand-light' : ''
-                          }`}
+                        onClick={() => setSelectedJobId(job.id)}
+                        className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${
+                          selectedJobId === job.id ? 'bg-brand-light' : ''
+                        }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium text-slate-900 truncate">
@@ -550,43 +507,87 @@ export default function ProjectDetail() {
             <Card className="p-4">
               <h3 className="font-semibold mb-1 text-sm">Values on This Page</h3>
               <p className="text-xs text-slate-500 mb-3">
-                Edit values directly in the document, then Save (mark for review), Approve, or Reject each one here.
+                Edit values directly in the document. Approve or reject each one here.
               </p>
               {!jobForSelectedDocument ? (
                 <p className="text-slate-500 text-sm">No extraction job for this document yet.</p>
               ) : fieldsOnPage.length === 0 ? (
                 <p className="text-slate-500 text-sm">No values detected on this page.</p>
               ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-2 max-h-[600px] overflow-y-auto">
                   {fieldsOnPage.map((field) => {
                     const isSaving = savingFieldId === field.field_id
                     const currentValue = edits[field.field_id] ?? getFieldDisplayValue(field)
                     const verdict = verifyByFieldId[field.field_id]
+                    const def = enrichedDefs[field.field_id]
+                    const match = def ? matchIndicator(currentValue, def.default_value) : null
                     return (
                       <div
                         key={field.field_id}
-                        className="rounded border border-slate-200 bg-white p-2.5 hover:border-brand transition-colors"
+                        className={`rounded border p-2.5 transition-colors ${
+                          match?.icon === '✓' ? 'border-green-200 bg-green-50/40 hover:border-green-400'
+                          : match?.icon === '≠' && currentValue ? 'border-amber-200 bg-amber-50/30 hover:border-amber-400'
+                          : !currentValue ? 'border-red-200 bg-red-50/30 hover:border-red-400'
+                          : 'border-slate-200 bg-white hover:border-brand'
+                        }`}
                       >
+                        {/* Field name + jump to doc */}
                         <button
                           type="button"
                           onClick={() => focusField(field.field_id)}
-                          className="w-full text-left"
+                          className="w-full text-left group"
                         >
-                          <div className="font-medium text-slate-900 text-xs">{field.field_label}</div>
-                          <div className="text-xs text-slate-600 mt-0.5 truncate">
-                            {currentValue || <span className="italic text-slate-400">empty</span>}
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-900 text-xs flex-1">{field.field_label}</span>
+                            {def?.clause_ref && (
+                              <span className="text-[9px] font-mono bg-amber-100 text-amber-700 rounded px-1 py-px shrink-0">§ {def.clause_ref}</span>
+                            )}
+                            <span className="text-[10px] text-slate-300 group-hover:text-brand transition-colors">↗</span>
                           </div>
                         </button>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <Badge type={field.validation_status}>{field.validation_status}</Badge>
-                          {edits[field.field_id] !== undefined &&
-                            edits[field.field_id] !== getFieldDisplayValue(field) ? (
-                            <span
-                              className="text-[10px] font-medium text-amber-600"
-                              title="Typed in the document but not yet saved, approved, or rejected"
-                            >
-                              unsaved
+
+                        {/* Extracted vs Expected side-by-side */}
+                        <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-[10px]">
+                          <div>
+                            <span className="text-slate-400 uppercase tracking-wide font-semibold block mb-0.5">Template Default</span>
+                            <span className="text-slate-500 font-mono bg-slate-100 rounded px-1.5 py-1 block truncate leading-tight" title={def?.default_value || '—'}>
+                              {def?.default_value || <span className="italic text-slate-300">—</span>}
                             </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 uppercase tracking-wide font-semibold block mb-0.5">Extracted</span>
+                            <span
+                              className={`font-mono rounded px-1.5 py-1 block truncate leading-tight ${
+                                currentValue
+                                  ? 'text-slate-900 bg-white border border-slate-200'
+                                  : 'text-red-400 italic bg-red-50 border border-red-200'
+                              }`}
+                              title={currentValue || '(not extracted)'}
+                            >
+                              {currentValue || '(not extracted)'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Match indicator bar */}
+                        {match && (
+                          <div className={`mt-1.5 flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 font-medium ${match.color}`}>
+                            <span>{match.icon}</span>
+                            <span>{match.label}</span>
+                          </div>
+                        )}
+                        {!currentValue && (
+                          <div className="mt-1.5 flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 font-medium text-red-600 bg-red-50">
+                            <span>⚠</span>
+                            <span>{def?.required ? 'Required field — value not extracted' : 'Value not found in document'}</span>
+                          </div>
+                        )}
+
+                        {/* Status badges + action buttons */}
+                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                          <Badge type={field.validation_status}>{field.validation_status}</Badge>
+                          {edits[field.field_id] !== undefined && edits[field.field_id] !== getFieldDisplayValue(field) ? (
+                            <span className="text-[10px] font-medium text-amber-600" title="Typed in the document but not yet saved">unsaved</span>
                           ) : null}
                           {verdict ? (
                             <Badge type={verifyBadgeType(verdict.status)} title={verdict.reason ?? undefined}>
@@ -594,46 +595,42 @@ export default function ProjectDetail() {
                             </Badge>
                           ) : null}
                           {field.confidence != null ? (
-                            <span className="text-[10px] text-slate-400">{Math.round(field.confidence * 100)}%</span>
+                            <span className="text-[10px] text-slate-400" title="AI extraction confidence">{Math.round(field.confidence * 100)}% conf</span>
                           ) : null}
                           <div className="flex-1" />
-                          {field.original_value !== undefined &&
-                            field.original_value !== null &&
+                          {field.original_value !== undefined && field.original_value !== null &&
                             (currentValue !== field.original_value || field.validation_status !== 'pending') ? (
-                            <button
-                              disabled={isSaving}
-                              onClick={() => void handleUndo(field)}
+                            <button disabled={isSaving} onClick={() => void handleUndo(field)}
                               className="text-slate-500 hover:text-slate-700 disabled:opacity-30"
-                              title={`Undo back to original extracted value: "${field.original_value}"`}
-                            >
+                              title={`Undo back to original: "${field.original_value}"`}>
                               <Icons.Undo className="w-4 h-4" />
                             </button>
                           ) : null}
-                          <button
-                            disabled={isSaving || edits[field.field_id] === undefined}
+                          <button disabled={isSaving || edits[field.field_id] === undefined}
                             onClick={() => void handleSaveEdit(field)}
                             className="text-amber-600 hover:text-amber-700 disabled:opacity-30"
-                            title="Save this edit for review (without approving or rejecting it)"
-                          >
+                            title="Save edit for review">
                             <Icons.Edit className="w-4 h-4" />
                           </button>
-                          <button
-                            disabled={isSaving}
-                            onClick={() => void handleApprove(field)}
+                          <button disabled={isSaving} onClick={() => void handleApprove(field)}
                             className="text-green-600 hover:text-green-700 disabled:opacity-40"
-                            title="Approve this value"
-                          >
+                            title="Approve this value">
                             <Icons.Check className="w-4 h-4" />
                           </button>
-                          <button
-                            disabled={isSaving}
-                            onClick={() => void handleReject(field)}
+                          <button disabled={isSaving} onClick={() => void handleReject(field)}
                             className="text-red-600 hover:text-red-700 disabled:opacity-40"
-                            title="Reject and clear this value"
-                          >
+                            title="Reject and clear this value">
                             <Icons.X className="w-4 h-4" />
                           </button>
                         </div>
+
+                        {/* Extraction hint */}
+                        {def?.extraction_hint && (
+                          <details className="text-[10px] mt-1.5">
+                            <summary className="cursor-pointer text-slate-400 hover:text-blue-600 select-none">🤖 How AI extracted this</summary>
+                            <p className="mt-1 text-slate-500 bg-slate-50 rounded p-1.5 leading-relaxed">{def.extraction_hint}</p>
+                          </details>
+                        )}
                       </div>
                     )
                   })}

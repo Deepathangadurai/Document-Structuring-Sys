@@ -1,34 +1,27 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Icons } from './icons'
-import { listPendingTemplates } from '../services/api'
 
 function NavItem({
   to,
   label,
   icon: Icon,
   active,
-  badge,
 }: {
   to: string
   label: string
   icon: (props: { className?: string }) => React.ReactElement
   active: boolean
-  badge?: number
 }) {
   return (
     <Link
       to={to}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${active ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
-        }`}
+      className={`w-full flex items-center gap-2.5 px-3 py-2 mb-1 rounded-lg text-sm font-medium transition-all ${
+        active ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+      }`}
     >
       <Icon className="w-5 h-5" />
-      <span className="flex-1">{label}</span>
-      {badge ? (
-        <span className="ml-auto text-xs font-semibold bg-amber-400 text-slate-900 rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-          {badge}
-        </span>
-      ) : null}
+      {label}
     </Link>
   )
 }
@@ -38,8 +31,6 @@ function useBreadcrumb(pathname: string): { label: string; trail: string[] } {
   if (pathname === '/projects') return { label: 'Projects', trail: [] }
   if (pathname === '/projects/new') return { label: 'New Project Setup', trail: ['Projects'] }
   if (pathname === '/templates') return { label: 'Templates', trail: [] }
-  if (pathname === '/templates/pending') return { label: 'Pending Review', trail: ['Templates'] }
-  if (pathname.startsWith('/templates/pending/')) return { label: 'Review Template', trail: ['Templates'] }
   if (pathname.startsWith('/projects/')) return { label: 'Project Workspace', trail: ['Projects'] }
   return { label: '', trail: [] }
 }
@@ -47,32 +38,6 @@ function useBreadcrumb(pathname: string): { label: string; trail: string[] } {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const { label, trail } = useBreadcrumb(location.pathname)
-
-  // Newly-synced/uploaded templates sit in "pending" until a human reviews
-  // and approves them (see template_service.sync_templates) - they never
-  // show up on the main Templates page or in project creation until then.
-  // Previously the ONLY hint this queue existed was a small text link on
-  // the Templates page itself, so templates could sit unreviewed
-  // indefinitely without anyone noticing. Surface the count here, on every
-  // page, so it's impossible to miss.
-  const [pendingCount, setPendingCount] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    async function poll() {
-      try {
-        const pending = await listPendingTemplates()
-        if (!cancelled) setPendingCount(pending.length)
-      } catch {
-        // Non-critical for shell chrome - nav still works without the badge.
-      }
-    }
-    void poll()
-    const timer = window.setInterval(poll, 10000)
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, [])
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
@@ -96,13 +61,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             active={location.pathname === '/projects/new'}
           />
           <NavItem to="/templates" label="Templates" icon={Icons.LayoutDashboard} active={location.pathname === '/templates'} />
-          <NavItem
-            to="/templates/pending"
-            label="Pending Review"
-            icon={Icons.FileText}
-            active={location.pathname.startsWith('/templates/pending')}
-            badge={pendingCount}
-          />
         </div>
 
         <div className="p-4 border-t border-white/10">
@@ -150,7 +108,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto relative">{children}</main>
+        <main className="flex-1 overflow-hidden relative">{children}</main>
       </div>
     </div>
   )
