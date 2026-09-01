@@ -1,7 +1,7 @@
 import tempfile
 import threading
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
@@ -173,7 +173,7 @@ def export_extraction(job_id: int, format: str = "json", db: Session = Depends(g
         try:
             pdf_path = DocumentExportService.convert_docx_to_pdf(str(docx_output_path))
             return FileResponse(
-                str(pdf_path),
+                pdf_path,
                 media_type="application/pdf",
                 filename=f"extraction_{job_id}.pdf",
             )
@@ -221,3 +221,77 @@ def update_extracted_field(job_id: int, field_id: str, payload: FieldUpdateReque
             for source in field.source_references
         ],
     }
+
+
+@router.get("/extraction/{job_id}/structural-check")
+def structural_check(job_id: int, db: Session = Depends(get_db)):
+    """
+    Presence-based structural check: does the source document contain the
+    expected labels from the master schema, regardless of page order?
+
+    Returns {status, details} where status ∈ {MATCH, REVIEW, MISMATCH}.
+    Call this before opening the editor to decide whether to show a warning.
+    """
+    from app.db.models import DocumentPage, Template
+    from app.services.template_validator import DocumentTemplateValidator
+
+    extraction_service = ExtractionService(db)
+    job = extraction_service.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Extraction job not found")
+
+    template = db.query(Template).filter_by(id=job.template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    pages = (
+        db.query(DocumentPage)
+        .filter_by(document_id=job.document_id)
+        .order_by(DocumentPage.page_number)
+        .all()
+    )
+    page_dicts = [{"page_number": p.page_number, "text": p.text or ""} for p in pages]
+    schema_dict: dict[str, Any] = cast(dict, template.schema)
+
+    result = DocumentTemplateValidator.validate_pre_extraction(schema_dict, page_dicts)
+    return {"status": result.status, "details": result.details}
+
+
+@router.get("/extraction/{job_id}/validate-output")
+def validate_output(job_id: int, db: Session = Depends(get_db)):
+    """
+    Pre-download structural re-check: generate the output docx in a temp
+    directory and run DocumentTemplateValidator.validate_pre_download on it.
+
+    Returns {status, details}.  The frontend shows this result inline before
+    handing the file to the user.  The actual download still uses /export.
+    """
+    import tempfile
+    from app.db.models import Template
+    from app.services.template_validator import DocumentTemplateValidator
+
+    extraction_service = ExtractionService(db)
+    job = extraction_service.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Extraction job not found")
+
+    template = db.query(Template).filter_by(id=job.template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir) / "output_check.docx"
+            extraction_service.export_as_docx(job, str(tmp_path))
+            schema_dict: dict[str, Any] = cast(dict, template.schema)
+            result = DocumentTemplateValidator.validate_pre_download(schema_dict, tmp_path)
+    except Exception as exc:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "REVIEW",
+                "details": [f"Pre-download validation encountered an error: {exc}"],
+            },
+        )
+
+    return {"status": result.status, "details": result.details}

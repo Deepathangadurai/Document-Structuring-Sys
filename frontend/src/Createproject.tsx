@@ -532,14 +532,8 @@ export default function CreateProject() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}`)}>
-                  Open Project Workspace
-                </Button>
-                <Button
-                  className="bg-[#1A3A6B] hover:bg-[#12294d] text-white shadow-sm flex items-center gap-2"
-                  onClick={() => navigate(`/projects/${projectId}/report`)}
-                >
-                  ✨ Open in Custom Report Editor & Download <Icons.ArrowRight className="w-4 h-4" />
+                <Button className="bg-[#1A3A6B] hover:bg-[#12294d] text-white shadow-sm flex items-center gap-2" onClick={() => navigate(`/projects/${projectId}`)}>
+                  Open Project Workspace <Icons.ArrowRight className="w-4 h-4" />
                 </Button>
               </div>
             </div>

@@ -482,12 +482,13 @@ export default function ProjectDetail() {
                   approvals/rejections you've made. This specification generates its own separate file.
                 </p>
                 <Button
-                  className="w-full bg-[#1A3A6B] hover:bg-[#12294d] text-white font-semibold py-2.5 shadow-sm flex items-center justify-center gap-2 mb-2"
-                  onClick={() => navigate(`/projects/${projectId}/report`)}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 shadow-sm flex items-center justify-center gap-2 mb-2"
+                  onClick={() => navigate(`/projects/${projectId}/edit/${jobForSelectedDocument.id}`)}
                 >
-                  ✨ Open in Custom Editor &amp; Rovo AI
+                  ✏️ Review &amp; Edit Fields
                 </Button>
                 <a href={getExtractionExportUrl(jobForSelectedDocument.id, 'docx')} className="block">
+
                   <Button variant="secondary" className="w-full">
                     <Icons.Download className="w-4 h-4" /> Download Word Document
                   </Button>

@@ -6,7 +6,7 @@ pydantic==2.7.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.0
 httpx==0.24.1
-qdrant-client==1.7.3
+rapidfuzz>=3.6.0
 python-multipart==0.0.6
 python-docx==0.8.11
 olefile==0.47

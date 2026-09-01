@@ -12,15 +12,15 @@ import TemplatePageReview from './components/TemplatePageReview'
 // 1. Fix CreateProject import to target Createproject.. directly in src/
 import CreateProject from "./Createproject";
 import ProjectDetail from './components/ProjectDetail'
-import CustomDocumentEditor from './components/CustomDocumentEditor'
+import JiraFieldEditor from './components/JiraFieldEditor'
+
 
 export default function App() {
   return (
     <Routes>
-      {/* Standalone Full-screen Report & Custom Editor (matching screenshot http://localhost:5175/lightningrisk/report) */}
-      <Route path="/lightningrisk/report" element={<CustomDocumentEditor />} />
-      <Route path="/report" element={<CustomDocumentEditor />} />
-      <Route path="/projects/:projectId/report" element={<CustomDocumentEditor />} />
+      {/* Jira-style field editor — full-screen, no AppShell chrome */}
+      <Route path="/projects/:projectId/edit/:jobId" element={<JiraFieldEditor />} />
+
 
       {/* AppShell Wrapped Views */}
       <Route
@@ -32,7 +32,6 @@ export default function App() {
               <Route path="/projects" element={<ProjectsList />} />
               <Route path="/projects/new" element={<CreateProject />} />
               <Route path="/projects/:projectId" element={<ProjectDetail />} />
-              <Route path="/editor" element={<CustomDocumentEditor />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/templates/pending" element={<TemplatePending />} />
               <Route path="/templates/pending/:templateId/review" element={<TemplatePageReview />} />

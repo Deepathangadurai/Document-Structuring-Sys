@@ -224,52 +224,21 @@ export async function getDashboardStats(): Promise<DashboardStatsResponse> {
   return handleResponse(await fetch(`${API_BASE}/dashboard/stats`))
 }
 
-// ---- AI & Real-time Export (LibreOffice, python-docx, Rovo-like AI) ----
+// ---- Structural validation (deterministic extractor) ----
 
-export interface AITransformPayload {
-  text: string
-  instruction: string
-  section_name?: string
-  context?: Record<string, any>
+export type StructuralValidationStatus = 'MATCH' | 'REVIEW' | 'MISMATCH'
+
+export interface StructuralValidationResult {
+  status: StructuralValidationStatus
+  details: string[]
 }
 
-export interface AITransformResult {
-  result: string
-  applied_instruction: string
-  model_used: string
+/** Pre-extraction presence check — call before loading the editor. */
+export async function structuralCheck(jobId: number): Promise<StructuralValidationResult> {
+  return fetchJson(`${API_BASE}/extraction/${jobId}/structural-check`)
 }
 
-export async function transformWithAI(payload: AITransformPayload): Promise<AITransformResult> {
-  return handleResponse(
-    await fetch(`${API_BASE}/ai/transform`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }),
-  )
-}
-
-export interface RealtimeExportPayload {
-  title: string
-  subtitle?: string
-  sections: Array<{
-    section_number?: string
-    section_name: string
-    content?: string
-    fields?: Array<{ field_label: string; value: string }>
-  }>
-  format: 'pdf' | 'docx' | 'json'
-  project_meta?: Record<string, any>
-}
-
-export async function exportRealtimeDocument(payload: RealtimeExportPayload): Promise<Blob> {
-  const response = await fetch(`${API_BASE}/documents/export-realtime`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (!response.ok) {
-    throw new Error(`Export failed: ${response.statusText}`)
-  }
-  return response.blob()
-}
+/** Pre-download output validation — call before triggering the file download. */
+export async function validateOutput(jobId: number): Promise<StructuralValidationResult> {
+  return fetchJson(`${API_BASE}/extraction/${jobId}/validate-output`)
+}

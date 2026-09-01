@@ -1,5 +1,5 @@
 {
-  "template_id": "specification_01",
+  "template_id": "specification_01_legacy_20260829T102433",
   "template_name": "ELECTRICAL DESIGN BASIS",
   "version": "2.0",
   "specification_number": "IP009-43-00-01-0",
@@ -22,12 +22,7 @@
           "required": true,
           "extraction_hint": "Extract the specification/document number shown red-highlighted at the top of the cover page.",
           "default_value": "IP-009",
-          "validation_rules": [],
-          "label_patterns": [
-            "Spec. No.",
-            "Spec. No",
-            "Spec No"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "project_name",
@@ -37,10 +32,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Project Name :\" at clause cover.",
           "default_value": "PASHMINA PROJECT",
-          "validation_rules": [],
-          "label_patterns": [
-            "Project Name"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "description",
@@ -50,10 +42,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Description / Document Title :\" at clause cover.",
           "default_value": "ELECTRICAL DESIGN BASIS",
-          "validation_rules": [],
-          "label_patterns": [
-            "Description / Document Title"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "client_name",
@@ -63,10 +52,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Client Name :\" at clause cover.",
           "default_value": "MOMENTIVE PERFORMANCE MATERIALS",
-          "validation_rules": [],
-          "label_patterns": [
-            "Client Name"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "location",
@@ -76,10 +62,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Location :\" at clause cover.",
           "default_value": "CHENNAI",
-          "validation_rules": [],
-          "label_patterns": [
-            "Location"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "revision",
@@ -89,10 +72,7 @@
           "required": false,
           "extraction_hint": "Extract the revision letter/number from the document control/header table (footer or first-page header row), if present.",
           "default_value": "0",
-          "validation_rules": [],
-          "label_patterns": [
-            "Revision"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "project_no",
@@ -102,11 +82,7 @@
           "required": false,
           "extraction_hint": "Extract the project number token from the spec number, e.g. \"IP009\" from \"IP009-43-00-01-0\".",
           "default_value": "IP009",
-          "validation_rules": [],
-          "label_patterns": [
-            "Project No.",
-            "Project No"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -123,11 +99,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Equipment Design temp :\" at clause 2.2.1.",
           "default_value": "45 Deg. C.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Equipment Design temp",
-            "Equipment Design Temp"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mean_relative_humidity",
@@ -137,11 +109,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Mean Relative humidity :\" at clause 2.2.2.",
           "default_value": "88% max, 77% min",
-          "validation_rules": [],
-          "label_patterns": [
-            "Mean Relative humidity",
-            "Mean Relative Humidity"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "monthly_heaviest_rainfall",
@@ -151,11 +119,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Monthly heaviest Rainfall :\" at clause 2.2.3.",
           "default_value": "143 mm",
-          "validation_rules": [],
-          "label_patterns": [
-            "Monthly heaviest Rainfall",
-            "Monthly Heaviest Rainfall"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "soil_resistivity",
@@ -165,11 +129,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Soil Resistivity in Ohm-mtr :\" at clause 2.2.4.",
           "default_value": "(Will be furnished later)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Soil Resistivity in Ohm-mtr",
-            "Soil Resistivity In Ohm-Mtr"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "altitude_msl",
@@ -179,12 +139,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Altitude above mean sea level :\" at clause 2.2.5.",
           "default_value": "16 Mtrs.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Altitude above mean sea level",
-            "Altitude Above Mean Sea Level",
-            "Altitude above mean sea Lvl"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "monthly_mean_wind_speed",
@@ -194,11 +149,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Monthly mean wind speed :\" at clause 2.2.6.",
           "default_value": "10 KMPH",
-          "validation_rules": [],
-          "label_patterns": [
-            "Monthly mean wind speed",
-            "Monthly Mean Wind Speed"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "seismic_zone",
@@ -208,11 +159,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Seismic zone :\" at clause 2.2.7.",
           "default_value": "Zone III",
-          "validation_rules": [],
-          "label_patterns": [
-            "Seismic zone",
-            "Seismic Zone"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -229,11 +176,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Name of grid substation :\" at clause 2.3.1.a.",
           "default_value": "220/110/33/11KV - Oragadam",
-          "validation_rules": [],
-          "label_patterns": [
-            "Name of grid substation",
-            "Name Of Grid Substation"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "num_feeders",
@@ -243,14 +186,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Number of feeders :\" at clause 2.3.1.b.",
           "default_value": "one",
-          "validation_rules": [],
-          "label_patterns": [
-            "Number of feeders",
-            "Number Of Feeders",
-            "No. of feeders",
-            "No of feeders",
-            "Num. of feeders"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "feeder_11kv_capacity",
@@ -260,12 +196,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Capacity of 11KV feeder :\" at clause 2.3.1.c.",
           "default_value": "Present + Technology center load (Future expansion is not considered)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Capacity of 11KV feeder",
-            "Capacity Of 11Kv Feeder",
-            "Cap. of 11KV feeder"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "min_load_pf",
@@ -275,11 +206,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Minimum load PF stipulated :\" at clause 2.3.1.d.",
           "default_value": "0.92 By supply authorities",
-          "validation_rules": [],
-          "label_patterns": [
-            "Minimum load PF stipulated",
-            "Minimum Load Pf Stipulated"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "plant_supply_voltage",
@@ -289,11 +216,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Plant Supply Voltage :\" at clause 2.3.1.e.",
           "default_value": "11KV AC supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Plant Supply Voltage",
-            "Plant Supply Volt"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "voltage_supply_variation",
@@ -303,12 +226,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Variation of voltage supply :\" at clause 2.3.1.f.",
           "default_value": "±10 %",
-          "validation_rules": [],
-          "label_patterns": [
-            "Variation of voltage supply",
-            "Variation Of Voltage Supply",
-            "Variation of Volt supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "frequency",
@@ -318,11 +236,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Frequency :\" at clause 2.3.1.g.",
           "default_value": "50 Hz",
-          "validation_rules": [],
-          "label_patterns": [
-            "Frequency",
-            "Freq."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "frequency_variation",
@@ -332,12 +246,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Variation of Frequency :\" at clause 2.3.1.h.",
           "default_value": "± 3%",
-          "validation_rules": [],
-          "label_patterns": [
-            "Variation of Frequency",
-            "Variation Of Frequency",
-            "Variation of Freq."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "grid_fault_level_11kv",
@@ -347,12 +256,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Expected Grid Fault level at 11KV :\" at clause 2.3.1.i.",
           "default_value": "250MVA (Assumed value to be confirmed later)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Expected Grid Fault level at 11KV",
-            "Expected Grid Fault Level At 11Kv",
-            "Expected Grid Fault Lvl at 11KV"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -369,11 +273,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Alternate power source :\" at clause 2.3.2.a.",
           "default_value": "Diesel Generator sets",
-          "validation_rules": [],
-          "label_patterns": [
-            "Alternate power source",
-            "Alternate Power Source"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_sets_capacity",
@@ -383,12 +283,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Capacity of DG sets :\" at clause 2.3.2.b.",
           "default_value": "To cater power supply to Present load (Excluding Technology center)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Capacity of DG sets",
-            "Capacity Of Dg Sets",
-            "Cap. of DG sets"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "future_expansion_provision",
@@ -398,11 +293,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Provision for future expansion :\" at clause 2.3.2.c.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Provision for future expansion",
-            "Provision For Future Expansion"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_supply_voltage",
@@ -412,12 +303,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"DG supply Voltage :\" at clause 2.3.2.d.",
           "default_value": "415V",
-          "validation_rules": [],
-          "label_patterns": [
-            "DG supply Voltage",
-            "Dg Supply Voltage",
-            "DG supply Volt"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "num_dg_sets",
@@ -427,12 +313,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"No. of DG sets envisaged :\" at clause 2.3.2.e.",
           "default_value": "One \"OR\" Two",
-          "validation_rules": [],
-          "label_patterns": [
-            "No. of DG sets envisaged",
-            "No of DG sets envisaged",
-            "No. Of Dg Sets Envisaged"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "export_power_to_grid",
@@ -442,11 +323,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Export of power to Grid :\" at clause 2.3.2.f.",
           "default_value": "Not envisaged",
-          "validation_rules": [],
-          "label_patterns": [
-            "Export of power to Grid",
-            "Export Of Power To Grid"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -463,13 +340,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Voltage of plant Low Voltage Distribution Network (LVDN) :\" at clause 2.4.1.",
           "default_value": "415V, 50Hz, 3ph, 4W Neutral solidly Earthed (Transformer Earthed Neutral)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Voltage of plant Low Voltage Distribution Network (LVDN)",
-            "Voltage Of Plant Low Voltage Distribution Network (Lvdn)",
-            "Volt of plant Low Volt Distribution Network (LVDN)",
-            "Voltage of plant Low Voltage Distribution Network"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motors_below_0_37kw",
@@ -479,12 +350,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Motors < 0.37KW :\" at clause 2.4.2.",
           "default_value": "230V, 50 Hz, 1ph, 3W",
-          "validation_rules": [],
-          "label_patterns": [
-            "Motors < 0.37KW",
-            "Motors < 0 37KW",
-            "Motors < 0.37Kw"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motors_upto_200kw",
@@ -494,12 +360,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Motors upto & including 200 KW :\" at clause 2.4.2.",
           "default_value": "415V; 50 Hz; 3ph; 3W",
-          "validation_rules": [],
-          "label_patterns": [
-            "Motors upto & including 200 KW",
-            "Motors Upto & Including 200 Kw",
-            "Motors upto and including 200 KW"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motors_above_200kw",
@@ -509,11 +370,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Motors above 200 KW :\" at clause 2.4.2.",
           "default_value": "415V; 50 Hz; 3ph; 3W",
-          "validation_rules": [],
-          "label_patterns": [
-            "Motors above 200 KW",
-            "Motors Above 200 Kw"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "heaters_below_3kw",
@@ -523,11 +380,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Heaters < 3 KW :\" at clause 2.4.3.",
           "default_value": "230 V, 50 Hz, 1 phase",
-          "validation_rules": [],
-          "label_patterns": [
-            "Heaters < 3 KW",
-            "Heaters < 3 Kw"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "heaters_above_3kw",
@@ -537,11 +390,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Heaters > 3 KW :\" at clause 2.4.4.",
           "default_value": "415 V; 50Hz, 3 phase",
-          "validation_rules": [],
-          "label_patterns": [
-            "Heaters > 3 KW",
-            "Heaters > 3 Kw"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mv_breaker_closing_tripping",
@@ -551,12 +400,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"MV Indoor & Outdoor breaker - Closing, tripping, indication :\" at clause 2.4.5.",
           "default_value": "110 V DC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "MV Indoor & Outdoor breaker - Closing, tripping, indication",
-            "Mv Indoor & Outdoor Breaker - Closing, Tripping, Indication",
-            "MV Indoor and Outdoor breaker - Closing, tripping, indication"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mv_disconnect_switch_operation",
@@ -566,12 +410,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"MV Outdoor Disconnecting switch - Opening, Closing & interlocking :\" at clause 2.4.5.",
           "default_value": "110 V DC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "MV Outdoor Disconnecting switch - Opening, Closing & interlocking",
-            "Mv Outdoor Disconnecting Switch - Opening, Closing & Interlocking",
-            "MV Outdoor Disconnecting switch - Opening, Closing and interlocking"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_starter_control_voltage",
@@ -581,12 +420,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Motor starter Control Voltage :\" at clause 2.4.6.",
           "default_value": "110 V + 10% ; 50 Hz ; 1ph ; 2W Grounded Neutral (Derived from each switchboard)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Motor starter Control Voltage",
-            "Motor Starter Control Voltage",
-            "Motor starter Control Volt"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lv_breaker_closing_spring",
@@ -596,11 +430,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"LV breaker - Closing, spring charging :\" at clause 2.4.7.",
           "default_value": "110 V + 10% ; 50 Hz ; 1ph ; 2W Grounded Neutral",
-          "validation_rules": [],
-          "label_patterns": [
-            "LV breaker - Closing, spring charging",
-            "Lv Breaker - Closing, Spring Charging"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lv_breaker_tripping_indication",
@@ -610,12 +440,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"LV breaker - Tripping, Indication & Protection relay aux supply :\" at clause 2.4.7.",
           "default_value": "110 V DC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "LV breaker - Tripping, Indication & Protection relay aux supply",
-            "Lv Breaker - Tripping, Indication & Protection Relay Aux Supply",
-            "LV breaker - Tripping, Indication and Protection relay aux supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_fixtures_supply",
@@ -625,10 +450,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Lighting Fixtures :\" at clause 2.4.8.",
           "default_value": "230 V, 50 Hz, 1ph, 3W, AC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Lighting Fixtures"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_receptacles_supply",
@@ -638,10 +460,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Lighting Receptacles :\" at clause 2.4.9.",
           "default_value": "230 V, 50 Hz, 1ph, 3W, AC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Lighting Receptacles"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "welding_receptacles_supply",
@@ -651,10 +470,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Welding Receptacles :\" at clause 2.4.10.",
           "default_value": "415 V, 50 Hz, 3ph, 5W, AC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Welding Receptacles"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dcs_power_supply",
@@ -664,11 +480,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"DCS Power Supply :\" at clause 2.4.11.",
           "default_value": "110V; 50 Hz; 1ph; 3W, AC Supply Grounded Neutral (From UPS system)",
-          "validation_rules": [],
-          "label_patterns": [
-            "DCS Power Supply",
-            "Dcs Power Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "instrumentation_power_supply",
@@ -678,10 +490,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Instrumentation Power Supply :\" at clause 2.4.12.",
           "default_value": "110V; 50 Hz; 1ph; 3W, AC Supply (From UPS system)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Instrumentation Power Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "fire_alarm_power_supply",
@@ -691,11 +500,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Fire alarm system power supply :\" at clause 2.4.13.",
           "default_value": "110V; 50 Hz; 1ph; 3W, AC Supply (From UPS system)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Fire alarm system power supply",
-            "Fire Alarm System Power Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "telephone_system_power_supply",
@@ -705,11 +510,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Telephone system power supply :\" at clause 2.4.14.",
           "default_value": "110V; 50 Hz; 1ph; 3W, AC Supply (From UPS system)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Telephone system power supply",
-            "Telephone System Power Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "public_address_power_supply",
@@ -719,11 +520,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Public address system power supply :\" at clause 2.4.15.",
           "default_value": "110V; 50 Hz; 1ph ;3W, AC Supply (From UPS system)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Public address system power supply",
-            "Public Address System Power Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "space_heater_supply",
@@ -733,11 +530,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Space heater supply :\" at clause 2.4.16.",
           "default_value": "230V, 50HZ, 1ph, 3W, AC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Space heater supply",
-            "Space Heater Supply"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -902,11 +695,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Inverter room / Power UPS Room :\" at clause 3.3.1.d.",
           "default_value": "Air conditioned",
-          "validation_rules": [],
-          "label_patterns": [
-            "Inverter room / Power UPS Room",
-            "Inverter Room / Power Ups Room"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "electrical_room_environment",
@@ -916,11 +705,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Electrical room :\" at clause 3.3.1.d.",
           "default_value": "Pressurized",
-          "validation_rules": [],
-          "label_patterns": [
-            "Electrical room",
-            "Electrical Room"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "control_room_environment",
@@ -930,10 +715,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Room :\" at clause 3.3.1.d.",
           "default_value": "Air Conditioned",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Room"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -950,11 +732,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Height of fence :\" at clause 3.3.2.a.",
           "default_value": "Minimum 6 Ft. from FFL.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Height of fence",
-            "Height Of Fence"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "transformer_area_clearance",
@@ -964,10 +742,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Clearance :\" at clause 3.3.2.b.",
           "default_value": "All around 1000 mm.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Clearance"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -984,11 +759,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Grounding Electrode type - Transformer Neutral Grounding :\" at clause 3.4.g.",
           "default_value": "Copper plate type Electrodes",
-          "validation_rules": [],
-          "label_patterns": [
-            "Grounding Electrode type - Transformer Neutral Grounding",
-            "Grounding Electrode Type - Transformer Neutral Grounding"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "body_grounding_electrode",
@@ -998,11 +769,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Grounding Electrode type - Body grounding :\" at clause 3.4.g.",
           "default_value": "GI pipe electrode",
-          "validation_rules": [],
-          "label_patterns": [
-            "Grounding Electrode type - Body grounding",
-            "Grounding Electrode Type - Body Grounding"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dcs_grounding_electrode",
@@ -1012,11 +779,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Grounding Electrode type - DCS grounding :\" at clause 3.4.g.",
           "default_value": "Copper rod / DCS vendors recommendation.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Grounding Electrode type - DCS grounding",
-            "Grounding Electrode Type - Dcs Grounding"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "main_earth_loop_material",
@@ -1026,12 +789,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Main earth loop material :\" at clause 3.4.h.",
           "default_value": "GI strip",
-          "validation_rules": [],
-          "label_patterns": [
-            "Main earth loop material",
-            "Main Earth Loop Material",
-            "Main earth loop Mat."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ground_resistance",
@@ -1041,10 +799,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Ground Resistance :\" at clause 3.4.i.",
           "default_value": "1 to 2 Ohms",
-          "validation_rules": [],
-          "label_patterns": [
-            "Ground Resistance"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "substation_earth_loop",
@@ -1054,11 +809,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Substation earth loop :\" at clause 3.4.j.",
           "default_value": "GI / copper",
-          "validation_rules": [],
-          "label_patterns": [
-            "Substation earth loop",
-            "Substation Earth Loop"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lightning_conductor",
@@ -1068,11 +819,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Lightning conductor :\" at clause 3.4.k.",
           "default_value": "Copper",
-          "validation_rules": [],
-          "label_patterns": [
-            "Lightning conductor",
-            "Lightning Conductor"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -1089,10 +836,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type :\" at clause 4.1.1.a.",
           "default_value": "Off load",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lbs_rated_voltage",
@@ -1102,12 +846,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Rated voltage :\" at clause 4.1.1.b.",
           "default_value": "11KV ±10 %",
-          "validation_rules": [],
-          "label_patterns": [
-            "Rated voltage",
-            "Rated Voltage",
-            "Rated Volt"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lbs_rated_frequency",
@@ -1117,12 +856,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Rated frequency :\" at clause 4.1.1.c.",
           "default_value": "50 HZ ±3 %",
-          "validation_rules": [],
-          "label_patterns": [
-            "Rated frequency",
-            "Rated Frequency",
-            "Rated Freq."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lbs_rated_current",
@@ -1132,11 +866,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Rated current :\" at clause 4.1.1.d.",
           "default_value": "400A",
-          "validation_rules": [],
-          "label_patterns": [
-            "Rated current",
-            "Rated Current"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lbs_short_circuit_level",
@@ -1146,12 +876,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Short circuit level at 11kV :\" at clause 4.1.1.e.",
           "default_value": "13.1 KA (To be confirmed later)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Short circuit level at 11kV",
-            "Short Circuit Level At 11Kv",
-            "Short circuit Lvl at 11kV"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -1168,14 +893,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Number of Generating Sets :\" at clause 4.2.1.a.",
           "default_value": "One OR Two",
-          "validation_rules": [],
-          "label_patterns": [
-            "Number of Generating Sets",
-            "Number Of Generating Sets",
-            "No. of Generating Sets",
-            "No of Generating Sets",
-            "Num. of Generating Sets"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_service",
@@ -1185,10 +903,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Service :\" at clause 4.2.1.b.",
           "default_value": "Standby",
-          "validation_rules": [],
-          "label_patterns": [
-            "Service"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_voltage",
@@ -1198,11 +913,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Voltage :\" at clause 4.2.1.c.",
           "default_value": "415V",
-          "validation_rules": [],
-          "label_patterns": [
-            "Voltage",
-            "Volt"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_frequency",
@@ -1212,11 +923,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Frequency :\" at clause 4.2.1.d.",
           "default_value": "50 HZ ±3 %",
-          "validation_rules": [],
-          "label_patterns": [
-            "Frequency",
-            "Freq."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_fault_level",
@@ -1226,11 +933,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Fault Level :\" at clause 4.2.1.e.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Fault Level",
-            "Fault Lvl"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_changeover_scheme",
@@ -1240,12 +943,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Change over Scheme (AMF /Manual) :\" at clause 4.2.1.f.",
           "default_value": "Auto mains failure",
-          "validation_rules": [],
-          "label_patterns": [
-            "Change over Scheme (AMF /Manual)",
-            "Change Over Scheme (Amf /Manual)",
-            "Change over Scheme"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_power_availability_time",
@@ -1255,11 +953,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Time within which power must be made available to essential loads :\" at clause 4.2.1.g.",
           "default_value": "Immediate",
-          "validation_rules": [],
-          "label_patterns": [
-            "Time within which power must be made available to essential loads",
-            "Time Within Which Power Must Be Made Available To Essential Loads"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_motor_starting_sequence",
@@ -1269,11 +963,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Sequences of motor starting :\" at clause 4.2.1.h.",
           "default_value": "Not required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Sequences of motor starting",
-            "Sequences Of Motor Starting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_mode_independent",
@@ -1283,11 +973,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Mode of operation - Independent :\" at clause 4.2.1.i.",
           "default_value": "Yes",
-          "validation_rules": [],
-          "label_patterns": [
-            "Mode of operation - Independent",
-            "Mode Of Operation - Independent"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_mode_synchronised",
@@ -1297,11 +983,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Mode of operation - Synchronised :\" at clause 4.2.1.j.",
           "default_value": "Momentary paralleling with Grid",
-          "validation_rules": [],
-          "label_patterns": [
-            "Mode of operation - Synchronised",
-            "Mode Of Operation - Synchronised"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_neutral_grounding",
@@ -1311,10 +993,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Neutral Grounding :\" at clause 4.2.1.k.",
           "default_value": "Solidly Grounded",
-          "validation_rules": [],
-          "label_patterns": [
-            "Neutral Grounding"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_acoustic_enclosure",
@@ -1324,11 +1003,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Acoustic enclosure :\" at clause 4.2.1.l.",
           "default_value": "Required.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Acoustic enclosure",
-            "Acoustic Enclosure"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_export_power",
@@ -1338,11 +1013,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Export of Power to Grid :\" at clause 4.2.1.m.",
           "default_value": "Not Envisaged",
-          "validation_rules": [],
-          "label_patterns": [
-            "Export of Power to Grid",
-            "Export Of Power To Grid"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dg_future_export_provision",
@@ -1352,11 +1023,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Future provision for Export of power to Grid :\" at clause 4.2.1.n.",
           "default_value": "Not Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Future provision for Export of power to Grid",
-            "Future Provision For Export Of Power To Grid"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -1373,11 +1040,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Speed of the engine :\" at clause 4.2.2.a.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Speed of the engine",
-            "Speed Of The Engine"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_starting_type",
@@ -1387,12 +1050,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of starting (Battery / Air) :\" at clause 4.2.2.b.",
           "default_value": "Battery",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of starting (Battery / Air)",
-            "Type Of Starting (Battery / Air)",
-            "Type of starting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_cooling_type",
@@ -1402,11 +1060,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Cooling of the Engine :\" at clause 4.2.2.c.",
           "default_value": "Radiator cooled",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Cooling of the Engine",
-            "Type Of Cooling Of The Engine"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_fuel_type",
@@ -1416,11 +1070,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Fuel Oil :\" at clause 4.2.2.d.",
           "default_value": "HSD",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Fuel Oil",
-            "Type Of Fuel Oil"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_fuel_storage",
@@ -1430,11 +1080,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Storage of Fuel Oil :\" at clause 4.2.2.e.",
           "default_value": "990 Litres capacity",
-          "validation_rules": [],
-          "label_patterns": [
-            "Storage of Fuel Oil",
-            "Storage Of Fuel Oil"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_cooling_water_requirement",
@@ -1444,11 +1090,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Requirement of Utilities - Cooling Water :\" at clause 4.2.2.f.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Requirement of Utilities - Cooling Water",
-            "Requirement Of Utilities - Cooling Water"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_max_drive_rating_kw",
@@ -1458,11 +1100,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Maximum Rating of the Drive to be started on the DG set - Rating KW :\" at clause 4.2.2.g.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Maximum Rating of the Drive to be started on the DG set - Rating KW",
-            "Maximum Rating Of The Drive To Be Started On The Dg Set - Rating Kw"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_max_drive_starting_type",
@@ -1472,11 +1110,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Maximum Rating of the Drive to be started on the DG set - Type of starting :\" at clause 4.2.2.g.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Maximum Rating of the Drive to be started on the DG set - Type of starting",
-            "Maximum Rating Of The Drive To Be Started On The Dg Set - Type Of Starting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_drive_load_condition",
@@ -1486,11 +1120,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Whether the Drive is started with No Load or on Load :\" at clause 4.2.2.h.",
           "default_value": "Both",
-          "validation_rules": [],
-          "label_patterns": [
-            "Whether the Drive is started with No Load or on Load",
-            "Whether The Drive Is Started With No Load Or On Load"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "engine_full_load_time",
@@ -1500,11 +1130,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Time within which DG can be fully loaded from the instant of starting signal given :\" at clause 4.2.2.i.",
           "default_value": "90 sec",
-          "validation_rules": [],
-          "label_patterns": [
-            "Time within which DG can be fully loaded from the instant of starting signal given",
-            "Time Within Which Dg Can Be Fully Loaded From The Instant Of Starting Signal Given"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -1521,12 +1147,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Alternator capacity :\" at clause 4.2.3.a.",
           "default_value": "Present process Critical loads only",
-          "validation_rules": [],
-          "label_patterns": [
-            "Alternator capacity",
-            "Alternator Capacity",
-            "Alternator Cap."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alternator_excitation_type",
@@ -1536,11 +1157,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Excitation :\" at clause 4.2.3.b.",
           "default_value": "Brushless",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Excitation",
-            "Type Of Excitation"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alternator_parallel_operation",
@@ -1550,11 +1167,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Suitability for parallel Operation :\" at clause 4.2.3.c.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Suitability for parallel Operation",
-            "Suitability For Parallel Operation"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alternator_cooling_type",
@@ -1564,11 +1177,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Cooling :\" at clause 4.2.3.d.",
           "default_value": "Air Cooled",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Cooling",
-            "Type Of Cooling"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alternator_enclosure_type",
@@ -1578,11 +1187,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of enclosure :\" at clause 4.2.3.e.",
           "default_value": "IP-23",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of enclosure",
-            "Type Of Enclosure"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alternator_temp_detect_winding",
@@ -1592,13 +1197,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Temperature Detecting elements - For Winding :\" at clause 4.2.3.f.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Temperature Detecting elements - For Winding",
-            "Temperature Detecting Elements - For Winding",
-            "Temp. Detecting elements - For Winding",
-            "Temp Detecting elements - For Winding"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alternator_temp_detect_bearing",
@@ -1608,13 +1207,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Temperature Detecting elements - For Bearing :\" at clause 4.2.3.f.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Temperature Detecting elements - For Bearing",
-            "Temperature Detecting Elements - For Bearing",
-            "Temp. Detecting elements - For Bearing",
-            "Temp Detecting elements - For Bearing"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alternator_num_bearings",
@@ -1624,14 +1217,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Number of Bearings :\" at clause 4.2.3.g.",
           "default_value": "As per Vendor's recommendation",
-          "validation_rules": [],
-          "label_patterns": [
-            "Number of Bearings",
-            "Number Of Bearings",
-            "No. of Bearings",
-            "No of Bearings",
-            "Num. of Bearings"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alternator_insulation_class",
@@ -1641,11 +1227,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Class of insulation :\" at clause 4.2.3.h.",
           "default_value": "Class - F with temp. rise limited to class B",
-          "validation_rules": [],
-          "label_patterns": [
-            "Class of insulation",
-            "Class Of Insulation"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -1662,12 +1244,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Voltage Ratio at No Load :\" at clause 4.3.a.",
           "default_value": "11 / 0.433kV",
-          "validation_rules": [],
-          "label_patterns": [
-            "Voltage Ratio at No Load",
-            "Voltage Ratio At No Load",
-            "Volt Ratio at No Load"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_spare_capacity",
@@ -1677,12 +1254,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Spare Capacity considered :\" at clause 4.3.b.",
           "default_value": "Operating load not beyond 80%",
-          "validation_rules": [],
-          "label_patterns": [
-            "Spare Capacity considered",
-            "Spare Capacity Considered",
-            "Spare Cap. considered"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_tap_changer",
@@ -1692,10 +1264,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Tap Changer :\" at clause 4.3.c.",
           "default_value": "Off Circuit",
-          "validation_rules": [],
-          "label_patterns": [
-            "Tap Changer"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_tap_changing_range",
@@ -1705,11 +1274,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Range of Tap Changing :\" at clause 4.3.d.",
           "default_value": "+ 5% at 2.5 % per step.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Range of Tap Changing",
-            "Range Of Tap Changing"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_cooling",
@@ -1719,10 +1284,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Cooling :\" at clause 4.3.e.",
           "default_value": "ONAN",
-          "validation_rules": [],
-          "label_patterns": [
-            "Cooling"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_primary_termination",
@@ -1732,10 +1294,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Termination - Primary Termination :\" at clause 4.3.f.",
           "default_value": "Cable",
-          "validation_rules": [],
-          "label_patterns": [
-            "Termination - Primary Termination"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_secondary_termination",
@@ -1745,11 +1304,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Termination - Secondary termination :\" at clause 4.3.f.",
           "default_value": "Bus duct",
-          "validation_rules": [],
-          "label_patterns": [
-            "Termination - Secondary termination",
-            "Termination - Secondary Termination"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_neutral_ground_arrangement",
@@ -1759,10 +1314,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Neutral Ground Arrangement :\" at clause 4.3.g.",
           "default_value": "Solid grounding",
-          "validation_rules": [],
-          "label_patterns": [
-            "Neutral Ground Arrangement"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_vector_group",
@@ -1772,11 +1324,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Vector Group. :\" at clause 4.3.h.",
           "default_value": "Dyn 11",
-          "validation_rules": [],
-          "label_patterns": [
-            "Vector Group.",
-            "Vector Group"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_special_accessories",
@@ -1786,11 +1334,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Special Accessories such as MOG, WTI, OTI, Gas relay :\" at clause 4.3.i.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Special Accessories such as MOG, WTI, OTI, Gas relay",
-            "Special Accessories Such As Mog, Wti, Oti, Gas Relay"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_temp_rise",
@@ -1800,13 +1344,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Temperature rise of oil / winding :\" at clause 4.3.j.",
           "default_value": "50/55°C (by oil / winding resp.) over ambient temp.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Temperature rise of oil / winding",
-            "Temperature Rise Of Oil / Winding",
-            "Temp. rise of oil / winding",
-            "Temp rise of oil / winding"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_winding_material",
@@ -1816,12 +1354,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Winding Material (Cu / Al) :\" at clause 4.3.k.",
           "default_value": "Copper",
-          "validation_rules": [],
-          "label_patterns": [
-            "Winding Material (Cu / Al)",
-            "Winding Mat. (Cu / Al)",
-            "Winding Material"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_impedance",
@@ -1831,11 +1364,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Impedance with tolerance :\" at clause 4.3.l.",
           "default_value": "As per IS",
-          "validation_rules": [],
-          "label_patterns": [
-            "Impedance with tolerance",
-            "Impedance With Tolerance"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "dt_painting",
@@ -1845,10 +1374,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Painting :\" at clause 4.3.m.",
           "default_value": "RAL 7032",
-          "validation_rules": [],
-          "label_patterns": [
-            "Painting"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -1865,12 +1391,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type & section :\" at clause 4.4.a.",
           "default_value": "Non-segregated - Air Insulated",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type & section",
-            "Type & Section",
-            "Type and section"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_section_shape",
@@ -1880,11 +1401,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Bus duct section :\" at clause 4.4.b.",
           "default_value": "Rectangular",
-          "validation_rules": [],
-          "label_patterns": [
-            "Bus duct section",
-            "Bus Duct Section"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_degree_protection",
@@ -1894,11 +1411,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection :\" at clause 4.4.c.",
           "default_value": "Indoor : IP 54, Outdoor : IP55",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection",
-            "Degree Of Protection"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_continuous_rating",
@@ -1908,11 +1421,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Continuous rating of Busbars :\" at clause 4.4.d.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Continuous rating of Busbars",
-            "Continuous Rating Of Busbars"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_fault_level",
@@ -1922,12 +1431,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Fault level :\" at clause 4.4.e.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Fault level",
-            "Fault Level",
-            "Fault Lvl"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_voltage_grade",
@@ -1937,12 +1441,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Voltage grade :\" at clause 4.4.f.",
           "default_value": "415 Volts",
-          "validation_rules": [],
-          "label_patterns": [
-            "Voltage grade",
-            "Voltage Grade",
-            "Volt grade"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_material",
@@ -1952,13 +1451,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Busbar material - Phase & Neutral color/shade :\" at clause 4.4.g.",
           "default_value": "RAL 7032",
-          "validation_rules": [],
-          "label_patterns": [
-            "Busbar material - Phase & Neutral color/shade",
-            "Busbar Material - Phase & Neutral Color/Shade",
-            "Busbar Mat. - Phase & Neutral color/shade",
-            "Busbar material - Phase and Neutral color/shade"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_phase_neutral_material",
@@ -1968,13 +1461,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Busbar material - Phase & Neutral :\" at clause 4.4.g.",
           "default_value": "Aluminium",
-          "validation_rules": [],
-          "label_patterns": [
-            "Busbar material - Phase & Neutral",
-            "Busbar Material - Phase & Neutral",
-            "Busbar Mat. - Phase & Neutral",
-            "Busbar material - Phase and Neutral"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_earth_busbar_material",
@@ -1984,12 +1471,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Busbar material - Earth Busbar :\" at clause 4.4.g.",
           "default_value": "Aluminium \"OR\" GI",
-          "validation_rules": [],
-          "label_patterns": [
-            "Busbar material - Earth Busbar",
-            "Busbar Material - Earth Busbar",
-            "Busbar Mat. - Earth Busbar"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "busduct_flexible_connections",
@@ -1999,11 +1481,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Copper flexible connections :\" at clause 4.4.h.",
           "default_value": "PMCC end & Transformer end",
-          "validation_rules": [],
-          "label_patterns": [
-            "Copper flexible connections",
-            "Copper Flexible Connections"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2020,11 +1498,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Intelligent / Non intelligent :\" at clause 4.5.1.a.",
           "default_value": "Non-Intelligent",
-          "validation_rules": [],
-          "label_patterns": [
-            "Intelligent / Non intelligent",
-            "Intelligent / Non Intelligent"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pmcc_single_double_front",
@@ -2034,11 +1508,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Single / double front :\" at clause 4.5.1.b.",
           "default_value": "Single front",
-          "validation_rules": [],
-          "label_patterns": [
-            "Single / double front",
-            "Single / Double Front"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pmcc_execution",
@@ -2048,11 +1518,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Execution Drawout / fixed :\" at clause 4.5.1.c.",
           "default_value": "Drawout",
-          "validation_rules": [],
-          "label_patterns": [
-            "Execution Drawout / fixed",
-            "Execution Drawout / Fixed"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pmcc_degree_protection",
@@ -2062,11 +1528,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection :\" at clause 4.5.1.d.",
           "default_value": "IP 21",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection",
-            "Degree Of Protection"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pmcc_spare_feeders",
@@ -2076,11 +1538,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Spare feeders :\" at clause 4.5.1.e.",
           "default_value": "10%",
-          "validation_rules": [],
-          "label_patterns": [
-            "Spare feeders",
-            "Spare Feeders"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pmcc_paint_shade",
@@ -2090,10 +1548,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Paint Shade :\" at clause 4.5.1.f.",
           "default_value": "RAL 7032",
-          "validation_rules": [],
-          "label_patterns": [
-            "Paint Shade"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2110,10 +1565,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Drawout / Non-Drawout :\" at clause 4.5.2.a.",
           "default_value": "Drawout",
-          "validation_rules": [],
-          "label_patterns": [
-            "Drawout / Non-Drawout"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "breaker_pole_config",
@@ -2123,11 +1575,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"TPN / 4 Pole :\" at clause 4.5.2.b.",
           "default_value": "TPN",
-          "validation_rules": [],
-          "label_patterns": [
-            "TPN / 4 Pole",
-            "Tpn / 4 Pole"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "breaker_release_type",
@@ -2137,11 +1585,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Direct Acting Releases/with relays :\" at clause 4.5.2.c.",
           "default_value": "μP based releases.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Direct Acting Releases/with relays",
-            "Direct Acting Releases/With Relays"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2158,11 +1602,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Material :\" at clause 4.5.3.a.",
           "default_value": "Aluminium",
-          "validation_rules": [],
-          "label_patterns": [
-            "Material",
-            "Mat."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pmcc_busbar_insulation",
@@ -2172,11 +1612,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Insulation of Busbars :\" at clause 4.5.3.b.",
           "default_value": "PVC sleeved",
-          "validation_rules": [],
-          "label_patterns": [
-            "Insulation of Busbars",
-            "Insulation Of Busbars"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pmcc_busbar_fault_level",
@@ -2186,11 +1622,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Fault Level :\" at clause 4.5.3.c.",
           "default_value": "Later.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Fault Level",
-            "Fault Lvl"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pmcc_busbar_temp_rise",
@@ -2200,14 +1632,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Temperature Rise above Max. Ambient of 47°C :\" at clause 4.5.3.d.",
           "default_value": "50°C (final temp. in fault condition should not go beyond 97°C)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Temperature Rise above Max. Ambient of 47°C",
-            "Temperature Rise above Max Ambient of 47°C",
-            "Temperature Rise Above Max. Ambient Of 47°C",
-            "Temp. Rise above Max. Ambient of 47°C",
-            "Temp Rise above Max. Ambient of 47°C"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2224,11 +1649,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"PMCC incoming :\" at clause 4.5.4.a.",
           "default_value": "LV Busduct",
-          "validation_rules": [],
-          "label_patterns": [
-            "PMCC incoming",
-            "Pmcc Incoming"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mcc_incoming_type",
@@ -2238,11 +1659,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"MCC incoming :\" at clause 4.5.4.b.",
           "default_value": "Cables",
-          "validation_rules": [],
-          "label_patterns": [
-            "MCC incoming",
-            "Mcc Incoming"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2259,11 +1676,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Cable entry :\" at clause 4.5.5.",
           "default_value": "Bottom",
-          "validation_rules": [],
-          "label_patterns": [
-            "Cable entry",
-            "Cable Entry"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "isolator_type_upto_630a",
@@ -2273,11 +1686,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Isolator type - Upto 630A :\" at clause 4.5.6.a.",
           "default_value": "MCCB",
-          "validation_rules": [],
-          "label_patterns": [
-            "Isolator type - Upto 630A",
-            "Isolator Type - Upto 630A"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "isolator_type_800a_above",
@@ -2287,12 +1696,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Isolator type - 800A and above :\" at clause 4.5.6.b.",
           "default_value": "ACB",
-          "validation_rules": [],
-          "label_patterns": [
-            "Isolator type - 800A and above",
-            "Isolator Type - 800A And Above",
-            "Isolator type - 800A & above"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_starter_dol",
@@ -2302,11 +1706,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Motor starters - DOL starting :\" at clause 4.5.7.a.",
           "default_value": "Upto & including 55 KW",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Motor starters - DOL starting",
-            "Type Of Motor Starters - Dol Starting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_starter_star_delta",
@@ -2316,11 +1716,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Motor starters - Star delta starting :\" at clause 4.5.7.b.",
           "default_value": "75 KW and above",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Motor starters - Star delta starting",
-            "Type Of Motor Starters - Star Delta Starting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "protective_relay_incoming",
@@ -2330,10 +1726,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Protective Relays - Incoming Feeders :\" at clause 4.5.8.a.",
           "default_value": "μP based release",
-          "validation_rules": [],
-          "label_patterns": [
-            "Protective Relays - Incoming Feeders"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "protective_relay_bus_coupler",
@@ -2343,10 +1736,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Protective Relays - Bus Coupler :\" at clause 4.5.8.b.",
           "default_value": "μP based release",
-          "validation_rules": [],
-          "label_patterns": [
-            "Protective Relays - Bus Coupler"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "protective_relay_feeder_mcc",
@@ -2356,11 +1746,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Protective Relays - Feeder to MCC, MLDB, Capacitor panel :\" at clause 4.5.8.c.",
           "default_value": "MCCB with built in release / Fuse",
-          "validation_rules": [],
-          "label_patterns": [
-            "Protective Relays - Feeder to MCC, MLDB, Capacitor panel",
-            "Protective Relays - Feeder To Mcc, Mldb, Capacitor Panel"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "metering_incoming_outgoing",
@@ -2370,12 +1756,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Metering - Incoming Feeder & outgoing feeders :\" at clause 4.5.9.",
           "default_value": "Digital Multi function meter",
-          "validation_rules": [],
-          "label_patterns": [
-            "Metering - Incoming Feeder & outgoing feeders",
-            "Metering - Incoming Feeder & Outgoing Feeders",
-            "Metering - Incoming Feeder and outgoing feeders"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "alarm_tripping_provision_dcs",
@@ -2385,11 +1766,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Provision of Alarm / Tripping at DCS :\" at clause 4.5.10.",
           "default_value": "Hard wired",
-          "validation_rules": [],
-          "label_patterns": [
-            "Provision of Alarm / Tripping at DCS",
-            "Provision Of Alarm / Tripping At Dcs"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "interfacing_to_dcs",
@@ -2399,11 +1776,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Interfacing to DCS :\" at clause 4.5.11.",
           "default_value": "Hard wired",
-          "validation_rules": [],
-          "label_patterns": [
-            "Interfacing to DCS",
-            "Interfacing To Dcs"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2420,11 +1793,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Single / double front :\" at clause 4.6.1.a.",
           "default_value": "Single front",
-          "validation_rules": [],
-          "label_patterns": [
-            "Single / double front",
-            "Single / Double Front"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_execution",
@@ -2434,11 +1803,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Execution Drawout / fixed :\" at clause 4.6.1.b.",
           "default_value": "Fixed",
-          "validation_rules": [],
-          "label_patterns": [
-            "Execution Drawout / fixed",
-            "Execution Drawout / Fixed"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_degree_protection",
@@ -2448,11 +1813,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection :\" at clause 4.6.1.c.",
           "default_value": "IP 21",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection",
-            "Degree Of Protection"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_spare_feeders",
@@ -2462,11 +1823,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Spare feeders :\" at clause 4.6.1.d.",
           "default_value": "10% \"OR\" one of each rating",
-          "validation_rules": [],
-          "label_patterns": [
-            "Spare feeders",
-            "Spare Feeders"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_paint_shade",
@@ -2476,10 +1833,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Paint Shade :\" at clause 4.6.1.e.",
           "default_value": "RAL 7032",
-          "validation_rules": [],
-          "label_patterns": [
-            "Paint Shade"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_compartmentalised",
@@ -2489,11 +1843,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Compartmentalised / Non compartmentalized :\" at clause 4.6.1.f.",
           "default_value": "Compartmentalized.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Compartmentalised / Non compartmentalized",
-            "Compartmentalised / Non Compartmentalized"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_material_construction",
@@ -2503,12 +1853,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Material of Construction :\" at clause 4.6.1.f.",
           "default_value": "CRCA sheet steel.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Material of Construction",
-            "Material Of Construction",
-            "Mat. of Construction"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_mounting",
@@ -2518,11 +1863,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Floor / wall mounting :\" at clause 4.6.1.g.",
           "default_value": "Floor",
-          "validation_rules": [],
-          "label_patterns": [
-            "Floor / wall mounting",
-            "Floor / Wall Mounting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_cable_entry",
@@ -2532,11 +1873,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Cable Entry (Top / Bottom) :\" at clause 4.6.1.h.",
           "default_value": "Bottom",
-          "validation_rules": [],
-          "label_patterns": [
-            "Cable Entry (Top / Bottom)",
-            "Cable Entry"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2553,11 +1890,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Material :\" at clause 4.6.2.a.",
           "default_value": "Aluminium",
-          "validation_rules": [],
-          "label_patterns": [
-            "Material",
-            "Mat."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_busbar_fault_level",
@@ -2567,12 +1900,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Fault level :\" at clause 4.6.2.b.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Fault level",
-            "Fault Level",
-            "Fault Lvl"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_busbar_location",
@@ -2582,10 +1910,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Location :\" at clause 4.6.2.c.",
           "default_value": "Top",
-          "validation_rules": [],
-          "label_patterns": [
-            "Location"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2602,11 +1927,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Incoming/Outgoing Feeders - Type of Component :\" at clause 4.6.3.a.",
           "default_value": "MCCB",
-          "validation_rules": [],
-          "label_patterns": [
-            "Incoming/Outgoing Feeders - Type of Component",
-            "Incoming/Outgoing Feeders - Type Of Component"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_feeder_design",
@@ -2616,12 +1937,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Incoming/Outgoing Feeders - Design (TPN / 4 Pole) :\" at clause 4.6.3.b.",
           "default_value": "TPN",
-          "validation_rules": [],
-          "label_patterns": [
-            "Incoming/Outgoing Feeders - Design (TPN / 4 Pole)",
-            "Incoming/Outgoing Feeders - Design (Tpn / 4 Pole)",
-            "Incoming/Outgoing Feeders - Design"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_feeder_metering",
@@ -2631,12 +1947,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Incoming/Outgoing Feeders - Metering (Voltage, Current) :\" at clause 4.6.3.c.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Incoming/Outgoing Feeders - Metering (Voltage, Current)",
-            "Incoming/Outgoing Feeders - Metering (Volt, Current)",
-            "Incoming/Outgoing Feeders - Metering"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "mldb_location",
@@ -2646,10 +1957,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Location :\" at clause 4.6.4.",
           "default_value": "Indoor",
-          "validation_rules": [],
-          "label_patterns": [
-            "Location"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2666,11 +1974,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Input supply :\" at clause 4.7.a.",
           "default_value": "415V, 3phase, 4Wire, AC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Input supply",
-            "Input Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_bypass_arrangement",
@@ -2680,11 +1984,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Bypass arrangement :\" at clause 4.7.b.",
           "default_value": "Direct-on-line / Star delta - As reqd.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Bypass arrangement",
-            "Bypass Arrangement"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_field_current_measurement",
@@ -2694,11 +1994,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Field current measurement :\" at clause 4.7.c.",
           "default_value": "CT's to be provided",
-          "validation_rules": [],
-          "label_patterns": [
-            "Field current measurement",
-            "Field Current Measurement"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_degree_protection",
@@ -2708,11 +2004,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection :\" at clause 4.7.d.",
           "default_value": "IP 21",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection",
-            "Degree Of Protection"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_rectifier_type",
@@ -2722,10 +2014,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Rectifier :\" at clause 4.7.e.",
           "default_value": "Diode Bridge",
-          "validation_rules": [],
-          "label_patterns": [
-            "Rectifier"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_type",
@@ -2735,10 +2024,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Inverter :\" at clause 4.7.f.",
           "default_value": "IGBT with adjustable v/f profiles",
-          "validation_rules": [],
-          "label_patterns": [
-            "Inverter"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_emi_rfi_suppression",
@@ -2748,11 +2034,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"EMI / RFI Suppression :\" at clause 4.7.g.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "EMI / RFI Suppression",
-            "Emi / Rfi Suppression"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_line_chokes",
@@ -2762,11 +2044,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Line chokes :\" at clause 4.7.h.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Line chokes",
-            "Line Chokes"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_speed_control",
@@ -2776,12 +2054,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Speed Control with Current & Torque limit :\" at clause 4.7.i.",
           "default_value": "Vector control software configured for open loop",
-          "validation_rules": [],
-          "label_patterns": [
-            "Speed Control with Current & Torque limit",
-            "Speed Control With Current & Torque Limit",
-            "Speed Control with Current and Torque limit"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_keypad_operator_panel",
@@ -2791,12 +2064,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Key pad for programming & operator panel :\" at clause 4.7.j.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Key pad for programming & operator panel",
-            "Key Pad For Programming & Operator Panel",
-            "Key pad for programming and operator panel"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_analogue_signals",
@@ -2806,11 +2074,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Analogue signals 4-20 mA :\" at clause 4.7.k.",
           "default_value": "Speed reference, Speed control, Current Output, KW Output",
-          "validation_rules": [],
-          "label_patterns": [
-            "Analogue signals 4-20 mA",
-            "Analogue Signals 4-20 Ma"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_digital_signals",
@@ -2820,11 +2084,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Digital signals :\" at clause 4.7.l.",
           "default_value": "DCS start / Stop, Run status, Fault alarm, Ready to start.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Digital signals",
-            "Digital Signals"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_power_loss_ride_through",
@@ -2834,11 +2094,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Power loss ride through facility :\" at clause 4.7.m.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Power loss ride through facility",
-            "Power Loss Ride Through Facility"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_long_cable_length",
@@ -2848,11 +2104,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Drives are suitable for long cable length :\" at clause 4.7.n.",
           "default_value": "Approx. 300Mtrs.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Drives are suitable for long cable length",
-            "Drives Are Suitable For Long Cable Length"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "inverter_mounting",
@@ -2862,10 +2114,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Mounting :\" at clause 4.7.o.",
           "default_value": "Floor/Wall \"OR\" housed in PMCC/MCC",
-          "validation_rules": [],
-          "label_patterns": [
-            "Mounting"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -2882,11 +2131,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"AC Input supply :\" at clause 4.8.a.",
           "default_value": "415V ±10 %, 50HZ, 3ph, 4Wire AC.",
-          "validation_rules": [],
-          "label_patterns": [
-            "AC Input supply",
-            "Ac Input Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_output_voltage_instrument",
@@ -2896,13 +2141,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Output voltage & variation - Instrument UPS :\" at clause 4.8.b.",
           "default_value": "110 V ±2 %",
-          "validation_rules": [],
-          "label_patterns": [
-            "Output voltage & variation - Instrument UPS",
-            "Output Voltage & Variation - Instrument Ups",
-            "Output Volt & variation - Instrument UPS",
-            "Output voltage and variation - Instrument UPS"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_output_voltage_power",
@@ -2912,13 +2151,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Output voltage & variation - Power UPS :\" at clause 4.8.b.",
           "default_value": "415 V ±2 %",
-          "validation_rules": [],
-          "label_patterns": [
-            "Output voltage & variation - Power UPS",
-            "Output Voltage & Variation - Power Ups",
-            "Output Volt & variation - Power UPS",
-            "Output voltage and variation - Power UPS"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_output_frequency",
@@ -2928,13 +2161,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Output frequency & variation :\" at clause 4.8.c.",
           "default_value": "50 HZ ±1 %",
-          "validation_rules": [],
-          "label_patterns": [
-            "Output frequency & variation",
-            "Output Frequency & Variation",
-            "Output Freq. & variation",
-            "Output frequency and variation"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_rated_kva_instrument",
@@ -2944,11 +2171,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Rated KVA - Instrument UPS :\" at clause 4.8.d.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Rated KVA - Instrument UPS",
-            "Rated Kva - Instrument Ups"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_rated_kva_power",
@@ -2958,11 +2181,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Rated KVA - Power UPS :\" at clause 4.8.d.",
           "default_value": "Later (Phase I Critical loads.)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Rated KVA - Power UPS",
-            "Rated Kva - Power Ups"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_static_transfer_switch",
@@ -2972,11 +2191,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Static Transfer switch :\" at clause 4.8.e.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Static Transfer switch",
-            "Static Transfer Switch"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_audio_visual_alarm",
@@ -2986,11 +2201,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Audio visual alarm :\" at clause 4.8.f.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Audio visual alarm",
-            "Audio Visual Alarm"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_ac_distribution_board",
@@ -3000,11 +2211,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"AC distribution board :\" at clause 4.8.g.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "AC distribution board",
-            "Ac Distribution Board"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_battery_type",
@@ -3014,11 +2221,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Battery type :\" at clause 4.8.h.",
           "default_value": "Lead acid Sealed low maintenance",
-          "validation_rules": [],
-          "label_patterns": [
-            "Battery type",
-            "Battery Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_backup_duration_power",
@@ -3028,11 +2231,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Duration of back-up for rated output - Power UPS :\" at clause 4.8.i.",
           "default_value": "6 Minutes",
-          "validation_rules": [],
-          "label_patterns": [
-            "Duration of back-up for rated output - Power UPS",
-            "Duration Of Back-Up For Rated Output - Power Ups"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "ups_backup_duration_instrument",
@@ -3042,11 +2241,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Duration of back-up for rated output - Instrument UPS :\" at clause 4.8.i.",
           "default_value": "30 Minutes",
-          "validation_rules": [],
-          "label_patterns": [
-            "Duration of back-up for rated output - Instrument UPS",
-            "Duration Of Back-Up For Rated Output - Instrument Ups"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -3063,11 +2258,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"AC Input supply :\" at clause 4.9.a.",
           "default_value": "415V ±10 %, 50HZ, 3ph, 4Wire AC.",
-          "validation_rules": [],
-          "label_patterns": [
-            "AC Input supply",
-            "Ac Input Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "battery_ac_input_frequency",
@@ -3077,12 +2268,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"AC input frequency :\" at clause 4.9.b.",
           "default_value": "50 HZ ±3 %",
-          "validation_rules": [],
-          "label_patterns": [
-            "AC input frequency",
-            "Ac Input Frequency",
-            "AC input Freq."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "battery_dc_voltage_nominal",
@@ -3092,12 +2278,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"DC output voltage settings - Nominal :\" at clause 4.9.c.",
           "default_value": "110V",
-          "validation_rules": [],
-          "label_patterns": [
-            "DC output voltage settings - Nominal",
-            "Dc Output Voltage Settings - Nominal",
-            "DC output Volt settings - Nominal"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "battery_dc_voltage_float",
@@ -3107,12 +2288,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"DC output voltage settings - Float :\" at clause 4.9.c.",
           "default_value": "121V",
-          "validation_rules": [],
-          "label_patterns": [
-            "DC output voltage settings - Float",
-            "Dc Output Voltage Settings - Float",
-            "DC output Volt settings - Float"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "battery_dc_voltage_boost",
@@ -3122,12 +2298,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"DC output voltage settings - Boost :\" at clause 4.9.c.",
           "default_value": "148V",
-          "validation_rules": [],
-          "label_patterns": [
-            "DC output voltage settings - Boost",
-            "Dc Output Voltage Settings - Boost",
-            "DC output Volt settings - Boost"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "battery_power_conversion",
@@ -3137,11 +2308,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Power conversion :\" at clause 4.9.d.",
           "default_value": "AC to DC by means of three phase thyristor controlled rectifier",
-          "validation_rules": [],
-          "label_patterns": [
-            "Power conversion",
-            "Power Conversion"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "battery_type",
@@ -3151,11 +2318,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Battery type :\" at clause 4.9.h.",
           "default_value": "Nickel-Cadmium",
-          "validation_rules": [],
-          "label_patterns": [
-            "Battery type",
-            "Battery Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "battery_future_load_growth",
@@ -3165,11 +2328,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Future load growth :\" at clause 4.9.i.",
           "default_value": "For phase II loads",
-          "validation_rules": [],
-          "label_patterns": [
-            "Future load growth",
-            "Future Load Growth"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "battery_backup_duration",
@@ -3179,11 +2338,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Duration of back-up for rated output :\" at clause 4.9.i.",
           "default_value": "8 Hrs.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Duration of back-up for rated output",
-            "Duration Of Back-Up For Rated Output"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -3200,12 +2355,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Construction (Squirrel Cage / Slip ring) :\" at clause 4.10.a.",
           "default_value": "Squirrel Cage",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Construction (Squirrel Cage / Slip ring)",
-            "Type Of Construction (Squirrel Cage / Slip Ring)",
-            "Type of Construction"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_cooling_type",
@@ -3215,11 +2365,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Cooling :\" at clause 4.10.b.",
           "default_value": "TEFC",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Cooling",
-            "Type Of Cooling"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_design",
@@ -3229,12 +2375,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Design (Standard / \"d\"/ \"e\" / n) :\" at clause 4.10.c.",
           "default_value": "As required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Design (Standard / \"d\"/ \"e\" / n)",
-            "Design (Standard / \"D\"/ \"E\" / N)",
-            "Design"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_mounting",
@@ -3244,11 +2385,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Mounting (Horizontal / Vertical) :\" at clause 4.10.d.",
           "default_value": "As required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Mounting (Horizontal / Vertical)",
-            "Mounting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_temp_detector_winding",
@@ -3258,13 +2395,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Temperature Detector in Winding :\" at clause 4.10.e.",
           "default_value": "For MV Motors (If any)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Temperature Detector in Winding",
-            "Temperature Detector In Winding",
-            "Temp. Detector in Winding",
-            "Temp Detector in Winding"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_temp_detector_bearing",
@@ -3274,13 +2405,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Temperature Detector in Bearing :\" at clause 4.10.f.",
           "default_value": "For MV Motors (If any)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Temperature Detector in Bearing",
-            "Temperature Detector In Bearing",
-            "Temp. Detector in Bearing",
-            "Temp Detector in Bearing"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_space_heater",
@@ -3290,11 +2415,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Space Heater in Motor :\" at clause 4.10.g.",
           "default_value": "75 KW and above",
-          "validation_rules": [],
-          "label_patterns": [
-            "Space Heater in Motor",
-            "Space Heater In Motor"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_degree_protection",
@@ -3304,11 +2425,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection :\" at clause 4.10.h.",
           "default_value": "IP 55",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection",
-            "Degree Of Protection"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_starting_type",
@@ -3318,11 +2435,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of starting :\" at clause 4.10.i.",
           "default_value": "As Applicable",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of starting",
-            "Type Of Starting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_speed_variation_method",
@@ -3332,11 +2445,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Method of Speed Variation, if any :\" at clause 4.10.j.",
           "default_value": "Inverter",
-          "validation_rules": [],
-          "label_patterns": [
-            "Method of Speed Variation, if any",
-            "Method Of Speed Variation, If Any"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_coupling_type",
@@ -3346,11 +2455,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Coupling :\" at clause 4.10.k.",
           "default_value": "Different for different equipment",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Coupling",
-            "Type Of Coupling"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_insulation",
@@ -3360,10 +2465,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Insulation :\" at clause 4.10.l.",
           "default_value": "Class - F with temperature rise limited to Class - B",
-          "validation_rules": [],
-          "label_patterns": [
-            "Insulation"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_painting",
@@ -3373,10 +2475,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Painting :\" at clause 4.10.m.",
           "default_value": "RAL-7032",
-          "validation_rules": [],
-          "label_patterns": [
-            "Painting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_service_factor_fixed_speed",
@@ -3386,12 +2485,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Service Factor - Upto 185 kW (Fixed speed motors) :\" at clause 4.10.o.",
           "default_value": "1.15",
-          "validation_rules": [],
-          "label_patterns": [
-            "Service Factor - Upto 185 kW (Fixed speed motors)",
-            "Service Factor - Upto 185 Kw (Fixed Speed Motors)",
-            "Service Factor - Upto 185 kW"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_service_factor_inverter",
@@ -3401,11 +2495,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Service Factor - Inverter driven motors :\" at clause 4.10.o.",
           "default_value": "1.0",
-          "validation_rules": [],
-          "label_patterns": [
-            "Service Factor - Inverter driven motors",
-            "Service Factor - Inverter Driven Motors"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_starter_dol",
@@ -3415,11 +2505,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Starters - DOL starting :\" at clause 4.10.p.",
           "default_value": "Upto & including 55 KW",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Starters - DOL starting",
-            "Type Of Starters - Dol Starting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_starter_star_delta",
@@ -3429,11 +2515,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Starters - Star delta starting :\" at clause 4.10.p.",
           "default_value": "75 KW and above.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Starters - Star delta starting",
-            "Type Of Starters - Star Delta Starting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_terminal_box_power_cables",
@@ -3443,11 +2525,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Terminal Box - Power cables :\" at clause 4.10.q.",
           "default_value": "Required",
-          "validation_rules": [],
-          "label_patterns": [
-            "Terminal Box - Power cables",
-            "Terminal Box - Power Cables"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "motor_terminal_box_space_heaters",
@@ -3457,11 +2535,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Terminal Box - Space heaters :\" at clause 4.10.q.",
           "default_value": "For motors 75KW & above",
-          "validation_rules": [],
-          "label_patterns": [
-            "Terminal Box - Space heaters",
-            "Terminal Box - Space Heaters"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -3478,12 +2552,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Material of Construction - Weather proof :\" at clause 4.11.a.",
           "default_value": "CRCA sheet steel/FRP.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Material of Construction - Weather proof",
-            "Material Of Construction - Weather Proof",
-            "Mat. of Construction - Weather proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lcs_material_flame_proof",
@@ -3493,12 +2562,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Material of Construction - Flame proof :\" at clause 4.11.a.",
           "default_value": "Cast Aluminium LM6",
-          "validation_rules": [],
-          "label_patterns": [
-            "Material of Construction - Flame proof",
-            "Material Of Construction - Flame Proof",
-            "Mat. of Construction - Flame proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lcs_protection_weather_proof",
@@ -3508,11 +2572,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection - Weather proof :\" at clause 4.11.b.",
           "default_value": "IP 55 - Outdoor Installation. / IP 21 - Indoor Installation.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection - Weather proof",
-            "Degree Of Protection - Weather Proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lcs_protection_flame_proof",
@@ -3522,11 +2582,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection - Flame proof :\" at clause 4.11.b.",
           "default_value": "IP 55 (Minimum)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection - Flame proof",
-            "Degree Of Protection - Flame Proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lcs_colour_shade",
@@ -3536,11 +2592,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Colour shade :\" at clause 4.11.c.",
           "default_value": "RAL-7032",
-          "validation_rules": [],
-          "label_patterns": [
-            "Colour shade",
-            "Colour Shade"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lcs_indicating_meter_size",
@@ -3550,11 +2602,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Size of Indicating Meters :\" at clause 4.11.d.",
           "default_value": "Later",
-          "validation_rules": [],
-          "label_patterns": [
-            "Size of Indicating Meters",
-            "Size Of Indicating Meters"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lcs_canopy",
@@ -3564,10 +2612,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Canopy :\" at clause 4.11.e.",
           "default_value": "Required for Outdoor installation",
-          "validation_rules": [],
-          "label_patterns": [
-            "Canopy"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lcs_ammeter",
@@ -3577,10 +2622,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Ammeter :\" at clause 4.11.f.",
           "default_value": "Motors rated 15KW & above",
-          "validation_rules": [],
-          "label_patterns": [
-            "Ammeter"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lcs_selector_switches",
@@ -3590,11 +2632,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Selector switches :\" at clause 4.11.g.",
           "default_value": "As per control scheme",
-          "validation_rules": [],
-          "label_patterns": [
-            "Selector switches",
-            "Selector Switches"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -3611,11 +2649,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Location of Light fittings with battery Back-up :\" at clause 5.1.e.",
           "default_value": "Required at strategic locations like stairway, Substation, Entrance etc.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Location of Light fittings with battery Back-up",
-            "Location Of Light Fittings With Battery Back-Up"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_jb_indoor_safe",
@@ -3625,11 +2659,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Lighting Junction boxes type - Indoor safe area :\" at clause 5.1.f.",
           "default_value": "GI conduit / WP cast iron",
-          "validation_rules": [],
-          "label_patterns": [
-            "Lighting Junction boxes type - Indoor safe area",
-            "Lighting Junction Boxes Type - Indoor Safe Area"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_jb_indoor_hazardous",
@@ -3639,11 +2669,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Lighting Junction boxes type - Indoor Hazardous area :\" at clause 5.1.f.",
           "default_value": "Explosion proof",
-          "validation_rules": [],
-          "label_patterns": [
-            "Lighting Junction boxes type - Indoor Hazardous area",
-            "Lighting Junction Boxes Type - Indoor Hazardous Area"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_jb_outdoor",
@@ -3653,11 +2679,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Lighting Junction boxes type - Outdoor area :\" at clause 5.1.f.",
           "default_value": "WP Cast iron / Explosion proof",
-          "validation_rules": [],
-          "label_patterns": [
-            "Lighting Junction boxes type - Outdoor area",
-            "Lighting Junction Boxes Type - Outdoor Area"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_control_street",
@@ -3667,12 +2689,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Philosophy - Street lighting / Pipe rack area (Auto/Manual) :\" at clause 5.1.g.",
           "default_value": "Auto",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Philosophy - Street lighting / Pipe rack area (Auto/Manual)",
-            "Control Philosophy - Street Lighting / Pipe Rack Area (Auto/Manual)",
-            "Control Philosophy - Street lighting / Pipe rack area"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_control_outdoor_process",
@@ -3682,12 +2699,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Philosophy - Outdoor process area (Auto/Manual) :\" at clause 5.1.g.",
           "default_value": "Auto",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Philosophy - Outdoor process area (Auto/Manual)",
-            "Control Philosophy - Outdoor Process Area (Auto/Manual)",
-            "Control Philosophy - Outdoor process area"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_control_process_building",
@@ -3697,12 +2709,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Philosophy - Process building area (Auto/Manual) :\" at clause 5.1.g.",
           "default_value": "Auto",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Philosophy - Process building area (Auto/Manual)",
-            "Control Philosophy - Process Building Area (Auto/Manual)",
-            "Control Philosophy - Process building area"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_control_enclosed_process",
@@ -3712,12 +2719,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Philosophy - Enclosed Process building area (Auto/Manual) :\" at clause 5.1.g.",
           "default_value": "Manual",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Philosophy - Enclosed Process building area (Auto/Manual)",
-            "Control Philosophy - Enclosed Process Building Area (Auto/Manual)",
-            "Control Philosophy - Enclosed Process building area"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_control_switchyard",
@@ -3727,10 +2729,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Philosophy - Outdoor Switchyard :\" at clause 5.1.g.",
           "default_value": "Auto",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Philosophy - Outdoor Switchyard"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_control_substation",
@@ -3740,11 +2739,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Philosophy - Electrical substation :\" at clause 5.1.g.",
           "default_value": "Manual",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Philosophy - Electrical substation",
-            "Control Philosophy - Electrical Substation"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_control_control_room",
@@ -3754,10 +2749,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Philosophy - Control Room :\" at clause 5.1.g.",
           "default_value": "Manual",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Philosophy - Control Room"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "lighting_control_office",
@@ -3767,11 +2759,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Control Philosophy - Office, Lab, Security, Ware house :\" at clause 5.1.g.",
           "default_value": "Manual",
-          "validation_rules": [],
-          "label_patterns": [
-            "Control Philosophy - Office, Lab, Security, Ware house",
-            "Control Philosophy - Office, Lab, Security, Ware House"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -3979,11 +2967,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Process plant / outdoor area :\" at clause 5.2.a.",
           "default_value": "Armoured / Unarmoured cable",
-          "validation_rules": [],
-          "label_patterns": [
-            "Process plant / outdoor area",
-            "Process Plant / Outdoor Area"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "wiring_false_ceiling",
@@ -3993,11 +2977,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Buildings with false ceiling :\" at clause 5.2.b.",
           "default_value": "Unarmoured cable / GI conduit",
-          "validation_rules": [],
-          "label_patterns": [
-            "Buildings with false ceiling",
-            "Buildings With False Ceiling"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "wiring_substation",
@@ -4007,10 +2987,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Substation :\" at clause 5.2.c.",
           "default_value": "Unarmoured cable / GI conduit / channel",
-          "validation_rules": [],
-          "label_patterns": [
-            "Substation"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "wiring_light_fitting_grounding",
@@ -4020,11 +2997,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Grounding of Light Fitting :\" at clause 5.2.d.",
           "default_value": "3rd Core of Cable",
-          "validation_rules": [],
-          "label_patterns": [
-            "Grounding of Light Fitting",
-            "Grounding Of Light Fitting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "wiring_cable_type",
@@ -4034,12 +3007,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Type of Cable (Cu / Al) :\" at clause 5.2.e.",
           "default_value": "Copper (Minimum) 2.5mm²",
-          "validation_rules": [],
-          "label_patterns": [
-            "Type of Cable (Cu / Al)",
-            "Type Of Cable (Cu / Al)",
-            "Type of Cable"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "wiring_voltage_grade",
@@ -4049,12 +3017,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Voltage Grade of Wire / Cable :\" at clause 5.2.f.",
           "default_value": "660V grade",
-          "validation_rules": [],
-          "label_patterns": [
-            "Voltage Grade of Wire / Cable",
-            "Voltage Grade Of Wire / Cable",
-            "Volt Grade of Wire / Cable"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -4071,11 +3034,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Single / double front :\" at clause 5.3.1.a.",
           "default_value": "Single front",
-          "validation_rules": [],
-          "label_patterns": [
-            "Single / double front",
-            "Single / Double Front"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_execution",
@@ -4085,11 +3044,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Execution Drawout / fixed :\" at clause 5.3.1.b.",
           "default_value": "Fixed",
-          "validation_rules": [],
-          "label_patterns": [
-            "Execution Drawout / fixed",
-            "Execution Drawout / Fixed"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_protection_weather_proof",
@@ -4099,12 +3054,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection - Weather proof (Outdoor) :\" at clause 5.3.1.c.",
           "default_value": "IP 55 - Outdoor Installation.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection - Weather proof (Outdoor)",
-            "Degree Of Protection - Weather Proof (Outdoor)",
-            "Degree of protection - Weather proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_protection_weather_proof_indoor",
@@ -4114,12 +3064,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection - Weather proof (Indoor) :\" at clause 5.3.1.c.",
           "default_value": "IP 21- Indoor Installation",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection - Weather proof (Indoor)",
-            "Degree Of Protection - Weather Proof (Indoor)",
-            "Degree of protection - Weather proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_protection_flame_proof",
@@ -4129,11 +3074,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Degree of protection - Flame proof :\" at clause 5.3.1.c.",
           "default_value": "IP 55 (Minimum)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Degree of protection - Flame proof",
-            "Degree Of Protection - Flame Proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_spare_feeders",
@@ -4143,11 +3084,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Spare feeders :\" at clause 5.3.1.d.",
           "default_value": "10% \"OR\" one of each rating",
-          "validation_rules": [],
-          "label_patterns": [
-            "Spare feeders",
-            "Spare Feeders"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_paint_shade",
@@ -4157,10 +3094,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Paint Shade :\" at clause 5.3.1.e.",
           "default_value": "RAL 7032",
-          "validation_rules": [],
-          "label_patterns": [
-            "Paint Shade"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_compartmentalised",
@@ -4170,11 +3104,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Compartmentalised / Non compartmentalized :\" at clause 5.3.1.f.",
           "default_value": "Non compartmentalized.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Compartmentalised / Non compartmentalized",
-            "Compartmentalised / Non Compartmentalized"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_material_weather_proof",
@@ -4184,12 +3114,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Material of Construction - Weather proof :\" at clause 5.3.1.g.",
           "default_value": "CRCA sheet steel.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Material of Construction - Weather proof",
-            "Material Of Construction - Weather Proof",
-            "Mat. of Construction - Weather proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_material_flame_proof",
@@ -4199,12 +3124,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Material of Construction - Flame proof :\" at clause 5.3.1.g.",
           "default_value": "Cast Aluminium LM6",
-          "validation_rules": [],
-          "label_patterns": [
-            "Material of Construction - Flame proof",
-            "Material Of Construction - Flame Proof",
-            "Mat. of Construction - Flame proof"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_mounting",
@@ -4214,11 +3134,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Floor / wall mounting :\" at clause 5.3.1.h.",
           "default_value": "wall",
-          "validation_rules": [],
-          "label_patterns": [
-            "Floor / wall mounting",
-            "Floor / Wall Mounting"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_cable_entry",
@@ -4228,10 +3144,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Cable Entry :\" at clause 5.3.1.i.",
           "default_value": "Top / Bottom",
-          "validation_rules": [],
-          "label_patterns": [
-            "Cable Entry"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -4248,11 +3161,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Busbar - Material :\" at clause 5.3.2.a.",
           "default_value": "Copper",
-          "validation_rules": [],
-          "label_patterns": [
-            "Busbar - Material",
-            "Busbar - Mat."
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_busbar_fault_level",
@@ -4262,12 +3171,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Busbar - Fault level :\" at clause 5.3.2.b.",
           "default_value": "10kA for 1 Sec.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Busbar - Fault level",
-            "Busbar - Fault Level",
-            "Busbar - Fault Lvl"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_incoming_feeder_type",
@@ -4277,12 +3181,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Incoming Feeder - Type (TPN /DP/SP) :\" at clause 5.3.3.a.",
           "default_value": "TPN",
-          "validation_rules": [],
-          "label_patterns": [
-            "Incoming Feeder - Type (TPN /DP/SP)",
-            "Incoming Feeder - Type (Tpn /Dp/Sp)",
-            "Incoming Feeder - Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_incoming_feeder_component",
@@ -4292,11 +3191,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Incoming Feeder - Type of Component :\" at clause 5.3.3.b.",
           "default_value": "ELCB with 300mA sensitivity",
-          "validation_rules": [],
-          "label_patterns": [
-            "Incoming Feeder - Type of Component",
-            "Incoming Feeder - Type Of Component"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_outgoing_feeder_type",
@@ -4306,12 +3201,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Outgoing Feeder - Type (SPN /DP) :\" at clause 5.3.4.a.",
           "default_value": "SPN , MCB",
-          "validation_rules": [],
-          "label_patterns": [
-            "Outgoing Feeder - Type (SPN /DP)",
-            "Outgoing Feeder - Type (Spn /Dp)",
-            "Outgoing Feeder - Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "sldb_outgoing_feeder_component",
@@ -4321,10 +3211,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Outgoing Feeder - Component :\" at clause 5.3.4.b.",
           "default_value": "MCB",
-          "validation_rules": [],
-          "label_patterns": [
-            "Outgoing Feeder - Component"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -4341,10 +3228,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Heat Tracing System :\" at clause 6.0.",
           "default_value": "Not Envisaged",
-          "validation_rules": [],
-          "label_patterns": [
-            "Heat Tracing System"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -4361,10 +3245,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Location :\" at clause 7.1.a.",
           "default_value": "Main panel at Control Room & Repeater panel at Security Main gate",
-          "validation_rules": [],
-          "label_patterns": [
-            "Location"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "fire_alarm_panel_mounting",
@@ -4374,11 +3255,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Mounting type :\" at clause 7.1.b.",
           "default_value": "Wall",
-          "validation_rules": [],
-          "label_patterns": [
-            "Mounting type",
-            "Mounting Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "fire_alarm_panel_standby_power",
@@ -4388,11 +3265,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Standby power :\" at clause 7.1.c.",
           "default_value": "24V DC sealed maintenance batteries",
-          "validation_rules": [],
-          "label_patterns": [
-            "Standby power",
-            "Standby Power"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "fire_alarm_panel_compatibility",
@@ -4402,10 +3275,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Compatibility :\" at clause 7.1.d.",
           "default_value": "Smoke detectors, Heat detectors, Manual call points",
-          "validation_rules": [],
-          "label_patterns": [
-            "Compatibility"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -4422,11 +3292,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Detector type :\" at clause 7.2.",
           "default_value": "Addressable analogue",
-          "validation_rules": [],
-          "label_patterns": [
-            "Detector type",
-            "Detector Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "fire_alarm_power_supply",
@@ -4436,11 +3302,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Power supply :\" at clause 7.3.",
           "default_value": "230V, 50 HZ, AC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Power supply",
-            "Power Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "fire_alarm_hooter_type",
@@ -4450,12 +3312,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Hooter type & range :\" at clause 7.4.",
           "default_value": "Electronic, 85 Db",
-          "validation_rules": [],
-          "label_patterns": [
-            "Hooter type & range",
-            "Hooter Type & Range",
-            "Hooter type and range"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "fire_alarm_num_zones",
@@ -4465,12 +3322,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"No. of Zones :\" at clause 7.5.",
           "default_value": "12 expandable upto 24 zones",
-          "validation_rules": [],
-          "label_patterns": [
-            "No. of Zones",
-            "No of Zones",
-            "No. Of Zones"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -4487,11 +3339,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"PA system type :\" at clause 8.1.a.",
           "default_value": "Modular design, microprocessor based",
-          "validation_rules": [],
-          "label_patterns": [
-            "PA system type",
-            "Pa System Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pa_num_zones",
@@ -4501,12 +3349,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"No. of Zones :\" at clause 8.1.b.",
           "default_value": "10 Expandable upto 20",
-          "validation_rules": [],
-          "label_patterns": [
-            "No. of Zones",
-            "No of Zones",
-            "No. Of Zones"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pa_interfacing",
@@ -4516,10 +3359,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Interfacing :\" at clause 8.1.c.",
           "default_value": "Telephone system",
-          "validation_rules": [],
-          "label_patterns": [
-            "Interfacing"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pa_power_supply",
@@ -4529,11 +3369,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Power supply :\" at clause 8.1.d.",
           "default_value": "110V, 50HZ, AC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Power supply",
-            "Power Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pa_speaker_type_horn",
@@ -4543,11 +3379,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Loud speaker type - Horn type :\" at clause 8.1.e.",
           "default_value": "Horn type - Safe & hazardous area",
-          "validation_rules": [],
-          "label_patterns": [
-            "Loud speaker type - Horn type",
-            "Loud Speaker Type - Horn Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pa_speaker_type_recessed",
@@ -4557,11 +3389,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Loud speaker type - Recessed type :\" at clause 8.1.e.",
           "default_value": "Recessed type - Suitable for false ceiling (If any)",
-          "validation_rules": [],
-          "label_patterns": [
-            "Loud speaker type - Recessed type",
-            "Loud Speaker Type - Recessed Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pa_speaker_range",
@@ -4571,11 +3399,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Loud speaker range :\" at clause 8.1.f.",
           "default_value": "30Mtrs",
-          "validation_rules": [],
-          "label_patterns": [
-            "Loud speaker range",
-            "Loud Speaker Range"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pa_location",
@@ -4585,10 +3409,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Location :\" at clause 8.1.g.",
           "default_value": "Control room",
-          "validation_rules": [],
-          "label_patterns": [
-            "Location"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "pa_paging_areas",
@@ -4598,11 +3419,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Areas for paging :\" at clause 8.1.h.",
           "default_value": "Speciality, Elastomer, Boiler, Utility, Ware House, Substation & Control Room.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Areas for paging",
-            "Areas For Paging"
-          ]
+          "validation_rules": []
         }
       ]
     },
@@ -4619,11 +3436,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"EPABX type :\" at clause 8.2.a.",
           "default_value": "Modular design, microprocessor based.",
-          "validation_rules": [],
-          "label_patterns": [
-            "EPABX type",
-            "Epabx Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "num_pt_lines",
@@ -4633,13 +3446,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"No. of P & T lines :\" at clause 8.2.b.",
           "default_value": "24 Expandable upto 32 lines",
-          "validation_rules": [],
-          "label_patterns": [
-            "No. of P & T lines",
-            "No of P & T lines",
-            "No. Of P & T Lines",
-            "No. of P and T lines"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "num_extensions",
@@ -4649,12 +3456,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"No. of extensions :\" at clause 8.2.c.",
           "default_value": "50 Extensions, expandable upto 75",
-          "validation_rules": [],
-          "label_patterns": [
-            "No. of extensions",
-            "No of extensions",
-            "No. Of Extensions"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "telephone_interfacing",
@@ -4664,10 +3466,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Interfacing :\" at clause 8.2.d.",
           "default_value": "Industrial paging system",
-          "validation_rules": [],
-          "label_patterns": [
-            "Interfacing"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "num_ip_phones",
@@ -4677,11 +3476,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"IP Phones :\" at clause 8.2.e.",
           "default_value": "6 (six) *",
-          "validation_rules": [],
-          "label_patterns": [
-            "IP Phones",
-            "Ip Phones"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "telephone_power_supply",
@@ -4691,11 +3486,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Power supply :\" at clause 8.2.f.",
           "default_value": "110V, 50HZ, AC Supply",
-          "validation_rules": [],
-          "label_patterns": [
-            "Power supply",
-            "Power Supply"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "telephone_battery_backup",
@@ -4705,11 +3496,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Battery backup :\" at clause 8.2.f.",
           "default_value": "30Mins.",
-          "validation_rules": [],
-          "label_patterns": [
-            "Battery backup",
-            "Battery Backup"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "telephone_battery_type",
@@ -4719,11 +3506,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Battery type :\" at clause 8.2.g.",
           "default_value": "Maintenance free",
-          "validation_rules": [],
-          "label_patterns": [
-            "Battery type",
-            "Battery Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "telephone_types",
@@ -4733,11 +3516,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Telephone types :\" at clause 8.2.h.",
           "default_value": "Basic telephone, Speaker telephone, Caller ID telephone, Explosion proof",
-          "validation_rules": [],
-          "label_patterns": [
-            "Telephone types",
-            "Telephone Types"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "telephone_cable_type",
@@ -4747,11 +3526,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Cable type :\" at clause 8.2.i.",
           "default_value": "Cat-6, Jelly filled armoured / unarmoured cable",
-          "validation_rules": [],
-          "label_patterns": [
-            "Cable type",
-            "Cable Type"
-          ]
+          "validation_rules": []
         },
         {
           "field_id": "telephone_location",
@@ -4761,10 +3536,7 @@
           "required": true,
           "extraction_hint": "Extract the red-highlighted value following \"Location :\" at clause 8.2.j.",
           "default_value": "Administration building",
-          "validation_rules": [],
-          "label_patterns": [
-            "Location"
-          ]
+          "validation_rules": []
         }
       ]
     }
