@@ -121,7 +121,7 @@ export default function TemplatePageReview() {
     // Pre-load page 1
     loadPageFields(1)
     return () => observer.disconnect()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template])
 
   /* ── Scroll to a page ── */
@@ -241,13 +241,12 @@ export default function TemplatePageReview() {
             key={p}
             onClick={() => scrollToPage(p)}
             title={`Page ${p}`}
-            className={`relative w-12 rounded-sm overflow-hidden border-2 transition-all shrink-0 ${
-              activePage === p
-                ? 'border-blue-400 shadow-[0_0_0_2px_rgba(96,165,250,0.4)]'
-                : approvedPages.has(p)
+            className={`relative w-12 rounded-sm overflow-hidden border-2 transition-all shrink-0 ${activePage === p
+              ? 'border-blue-400 shadow-[0_0_0_2px_rgba(96,165,250,0.4)]'
+              : approvedPages.has(p)
                 ? 'border-green-500/60 opacity-80 hover:opacity-100'
                 : 'border-transparent opacity-60 hover:opacity-90 hover:border-slate-500'
-            }`}
+              }`}
           >
             {pageImages[p - 1] ? (
               <img src={pageImages[p - 1]} alt={`Page ${p}`} className="w-full h-auto block" loading="lazy" />
@@ -300,14 +299,12 @@ export default function TemplatePageReview() {
               key={p}
               ref={el => { pageRefs.current[p] = el }}
               data-page={p}
-              className={`bg-white rounded-xl shadow-md overflow-hidden transition-all ${
-                activePage === p ? 'ring-2 ring-blue-400' : ''
-              } ${isApproved ? 'ring-2 ring-green-400' : ''}`}
+              className={`bg-white rounded-xl shadow-md overflow-hidden transition-all ${activePage === p ? 'ring-2 ring-blue-400' : ''
+                } ${isApproved ? 'ring-2 ring-green-400' : ''}`}
             >
               {/* Page header strip */}
-              <div className={`flex items-center justify-between px-5 py-2 border-b text-xs font-medium ${
-                isApproved ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-slate-200 text-slate-600'
-              }`}>
+              <div className={`flex items-center justify-between px-5 py-2 border-b text-xs font-medium ${isApproved ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-slate-200 text-slate-600'
+                }`}>
                 <span>Page {p} of {totalPages}</span>
                 <div className="flex items-center gap-2">
                   {isApproved
@@ -370,29 +367,20 @@ export default function TemplatePageReview() {
       </main>
 
       {/* ══════════════════════════════════════════════
-          RIGHT PANEL: fields on active page
+          RIGHT ASIDE: field editor for the active page
       ══════════════════════════════════════════════ */}
       <aside className="w-72 shrink-0 bg-white border-l border-slate-200 flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800">Page {activePage} Fields</h3>
-            {activeFields.length > 0 && (
-              <span className="text-[10px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 font-medium">
-                {activeFields.length} values
-              </span>
-            )}
-          </div>
+        {/* Aside header */}
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+          <p className="text-xs font-semibold text-slate-700">Page {activePage} — Fields</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+        {/* Field list */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
           {isLoadingActive ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-            </div>
+            <div className="text-xs text-slate-400 text-center py-6">Loading fields…</div>
           ) : activeFields.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-6 italic">
-              {pageFields[activePage] === undefined ? 'Scroll to load fields…' : 'No fields detected on this page.'}
-            </p>
+            <div className="text-xs text-slate-400 text-center py-6">No fields on this page</div>
           ) : (
             activeFields.map((field, idx) => {
               const fid = field.field_id || `field-${idx}`
@@ -400,73 +388,96 @@ export default function TemplatePageReview() {
               const isRemoved = removed.has(fid)
               const isApproved = approved.has(fid)
               const current = corrections[fid] ?? original
-              const clause = (field as any).clause_ref
+              const clause = (field as any).clause_ref as string | undefined
+              const hint = field.extraction_hint
+              const isRequired = field.required
 
               return (
                 <div
                   key={fid}
-                  className={`relative rounded-lg border p-3 transition-all ${
+                  className={`rounded-md border p-3 transition-all ${
                     isRemoved
-                      ? 'border-red-200 bg-red-50'
+                      ? 'border-red-200 bg-red-50/50'
                       : isApproved
-                      ? 'border-green-200 bg-green-50'
-                      : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'
+                      ? 'border-green-200 bg-green-50/50'
+                      : !current
+                      ? 'border-amber-200 bg-amber-50/40'
+                      : 'border-slate-200 bg-slate-50/60'
                   }`}
                 >
-
-                  <div className="flex items-start justify-between gap-1 mb-1.5">
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-xs font-medium leading-tight block ${
-                        isRemoved ? 'text-red-500 line-through' : 'text-slate-700'
-                      }`}>
+                  {/* Header: label + clause ref + badges */}
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <label className={`text-xs font-semibold leading-tight truncate ${isRemoved ? 'line-through text-red-400' : 'text-slate-800'}`}>
                         {label(field)}
-                      </span>
+                        {isRequired && <span className="text-red-500 ml-0.5">*</span>}
+                      </label>
+                      {clause && (
+                        <span className="text-[9px] font-mono bg-amber-100 text-amber-700 rounded px-1 py-px shrink-0">§ {clause}</span>
+                      )}
                     </div>
-                    <div className="flex gap-1 shrink-0">
-                      {/* Keep / Approve */}
-                      <button
-                        title="Mark as kept"
-                        onClick={() => toggleApprove(fid, current)}
-                        className={`w-5 h-5 rounded text-[10px] font-bold transition-colors flex items-center justify-center ${
-                          isApproved && !isRemoved
-                            ? 'bg-green-500 text-white'
-                            : 'bg-slate-100 text-slate-400 hover:bg-green-100 hover:text-green-600'
-                        }`}
-                      >
-                        ✓
-                      </button>
-                      {/* Remove */}
-                      <button
-                        title="Remove this field"
-                        onClick={() => toggleRemove(fid, current)}
-                        className={`w-5 h-5 rounded text-[10px] font-bold transition-colors flex items-center justify-center ${
-                          isRemoved
-                            ? 'bg-red-500 text-white'
-                            : 'bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-600'
-                        }`}
-                      >
-                        ✕
-                      </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isApproved && (
+                        <span className="text-[10px] bg-green-100 text-green-700 rounded-full px-1.5 py-px font-semibold">kept</span>
+                      )}
+                      {isRemoved && (
+                        <span className="text-[10px] bg-red-100 text-red-600 rounded-full px-1.5 py-px font-semibold">removed</span>
+                      )}
                     </div>
                   </div>
 
+                  {/* Hint text */}
+                  {hint && !isRemoved && (
+                    <p className="text-[11px] text-slate-500 mb-1.5 leading-relaxed">{hint}</p>
+                  )}
+
+                  {/* Editable textarea */}
                   {!isRemoved && (
-                    <input
-                      className="w-full text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
-                      value={current}
+                    <textarea
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400/30 resize-none bg-white"
+                      rows={current && current.length > 60 ? 3 : 1}
                       placeholder="(empty — will be extracted per project)"
+                      value={current}
                       onChange={e => setCorrections(c => ({ ...c, [fid]: e.target.value }))}
                     />
                   )}
 
-                  {isRemoved && (
-                    <button
-                      className="text-[10px] text-red-500 hover:text-red-700 mt-1"
-                      onClick={() => toggleRemove(fid, original)}
-                    >
-                      Undo remove
-                    </button>
-                  )}
+                  {/* Action row */}
+                  <div className="flex items-center gap-2 mt-2">
+                    {isRemoved ? (
+                      <button
+                        type="button"
+                        className="text-[11px] text-red-500 hover:text-red-700 font-medium hover:underline"
+                        onClick={() => toggleRemove(fid, original)}
+                      >
+                        Undo remove
+                      </button>
+                    ) : (
+                      <>
+                        <div className="flex-1" />
+                        <button
+                          type="button"
+                          title="Keep this field with the current value"
+                          onClick={() => toggleApprove(fid, current)}
+                          className={`text-[11px] font-semibold px-2.5 py-1 rounded border transition-colors ${
+                            isApproved
+                              ? 'bg-green-500 text-white border-green-500 hover:bg-green-600'
+                              : 'border-slate-200 text-slate-500 hover:border-green-400 hover:text-green-600 hover:bg-green-50'
+                          }`}
+                        >
+                          {isApproved ? '✓ Kept' : 'Keep'}
+                        </button>
+                        <button
+                          type="button"
+                          title="Remove this field from the template"
+                          onClick={() => toggleRemove(fid, current)}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded border border-slate-200 text-slate-500 hover:border-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               )
             })
@@ -486,7 +497,7 @@ export default function TemplatePageReview() {
             </button>
           )}
           <div className="text-[10px] text-center text-slate-400 mt-1">
-            {approvedPages.size}/{totalPages} pages approved
+            {approvedPages.size} / {totalPages} pages approved
           </div>
         </div>
       </aside>

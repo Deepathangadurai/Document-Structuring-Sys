@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 from app.core.config import settings
@@ -9,6 +9,31 @@ DATABASE_URL = os.getenv("DATABASE_URL") or settings.DATABASE_URL
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args, future=True, echo=False)
+
+if DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragmas(dbapi_connection, connection_record):
+        """Enable WAL mode so readers don't block on extraction writes.
+
+        Without WAL, SQLite serialises every reader and writer on the same
+        journal lock. During a long extraction job (many DB commits, one per
+        chunk) every status-poll request, page-load, or any other read blocks
+        until the write completes - which is why the UI appeared to freeze
+        even for simple GET requests while extraction was running.
+
+        WAL allows concurrent readers at all times. The writer (extraction)
+        still serialises against other writers, but that's fine: there's
+        typically only one extraction running at a time.
+
+        PRAGMA synchronous=NORMAL is safe with WAL - it only skips the
+        extra fsync after each commit that FULL mode adds, which matters
+        much more for rotating disks than SSDs.
+        """
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 

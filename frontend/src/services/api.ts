@@ -116,6 +116,18 @@ export async function createProject(payload: CreateProjectRequest): Promise<Proj
   )
 }
 
+export async function deleteProject(projectId: number): Promise<{ deleted: boolean }> {
+  return handleResponse(
+    await fetch(`${API_BASE}/projects/${projectId}`, { method: 'DELETE', cache: 'no-store' }),
+  )
+}
+
+export async function deleteTemplate(templateId: string): Promise<{ deleted: boolean }> {
+  return handleResponse(
+    await fetch(`${API_BASE}/templates/${templateId}`, { method: 'DELETE', cache: 'no-store' }),
+  )
+}
+
 // ---- Documents ----
 
 export async function uploadDocument(projectId: number, file: File): Promise<DocumentMetadataResponse> {
@@ -170,7 +182,7 @@ export function getDocumentPageImageUrl(documentId: number, pageNumber: number):
 
 // ---- Extraction ----
 
-export function getExtractionExportUrl(jobId: number, format: 'json' | 'docx'): string {
+export function getExtractionExportUrl(jobId: number, format: 'json' | 'docx' | 'pdf'): string {
   return `${API_BASE}/extraction/${jobId}/export?format=${format}`
 }
 
@@ -210,4 +222,54 @@ export async function updateExtractedField(
 
 export async function getDashboardStats(): Promise<DashboardStatsResponse> {
   return handleResponse(await fetch(`${API_BASE}/dashboard/stats`))
+}
+
+// ---- AI & Real-time Export (LibreOffice, python-docx, Rovo-like AI) ----
+
+export interface AITransformPayload {
+  text: string
+  instruction: string
+  section_name?: string
+  context?: Record<string, any>
+}
+
+export interface AITransformResult {
+  result: string
+  applied_instruction: string
+  model_used: string
+}
+
+export async function transformWithAI(payload: AITransformPayload): Promise<AITransformResult> {
+  return handleResponse(
+    await fetch(`${API_BASE}/ai/transform`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  )
+}
+
+export interface RealtimeExportPayload {
+  title: string
+  subtitle?: string
+  sections: Array<{
+    section_number?: string
+    section_name: string
+    content?: string
+    fields?: Array<{ field_label: string; value: string }>
+  }>
+  format: 'pdf' | 'docx' | 'json'
+  project_meta?: Record<string, any>
+}
+
+export async function exportRealtimeDocument(payload: RealtimeExportPayload): Promise<Blob> {
+  const response = await fetch(`${API_BASE}/documents/export-realtime`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    throw new Error(`Export failed: ${response.statusText}`)
+  }
+  return response.blob()
 }

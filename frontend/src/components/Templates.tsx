@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card } from './ui'
 import { Icons } from './icons'
-import { getTemplate, getTemplates, listPendingTemplates, uploadTemplate } from '../services/api'
+import { deleteTemplate, getTemplate, getTemplates, listPendingTemplates, uploadTemplate } from '../services/api'
 import type { TemplateListResponse } from '../types'
 
 function countFields(template: TemplateListResponse): { fields: number; sections: number } {
@@ -20,6 +20,8 @@ export default function Templates() {
   const [pendingCount, setPendingCount] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const navigate = useNavigate()
 
@@ -79,6 +81,21 @@ export default function Templates() {
     }
   }
 
+  async function handleDelete(templateId: string) {
+    setDeletingId(templateId)
+    setError(null)
+    try {
+      await deleteTemplate(templateId)
+      setTemplates((prev) => prev.filter((t) => t.template_id !== templateId))
+      if (selected?.template_id === templateId) setSelected(null)
+    } catch (err) {
+      setError(`Could not delete template: ${(err as Error).message}`)
+    } finally {
+      setDeletingId(null)
+      setConfirmDeleteId(null)
+    }
+  }
+
   return (
     <div className="p-8 max-w-7xl mx-auto overflow-y-auto h-full pb-20">
       <div className="mb-8 flex items-start justify-between gap-4">
@@ -130,6 +147,14 @@ export default function Templates() {
                       </div>
                       <div className="flex gap-2 items-center">
                         <Badge type="active">ACTIVE</Badge>
+                        <button
+                          type="button"
+                          title="Delete template"
+                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(t.template_id) }}
+                          className="ml-1 p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                        </button>
                         {t.structure_locked && (
                           <Badge type="secondary" title="Template structure is locked - only values can be edited">
                             <span className="text-xs">🔒 Locked</span>
@@ -253,6 +278,32 @@ export default function Templates() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmDeleteId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-sm p-6">
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">Delete template?</h2>
+            <p className="text-sm text-slate-500 mb-6">
+              This will permanently delete the template{' '}
+              <strong>{templates.find((t) => t.template_id === confirmDeleteId)?.template_name ?? confirmDeleteId}</strong>.
+              Projects that already use it will not be affected.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="secondary" onClick={() => setConfirmDeleteId(null)} disabled={deletingId !== null}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="!bg-red-600 hover:!bg-red-700"
+                onClick={() => void handleDelete(confirmDeleteId)}
+                disabled={deletingId !== null}
+              >
+                {deletingId ? 'Deleting...' : 'Delete'}
+              </Button>
             </div>
           </div>
         </div>

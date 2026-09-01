@@ -39,11 +39,20 @@ export interface TemplateListResponse {
   page_html?: string[]
 }
 
+export interface StaticBlock {
+  block_id: string
+  page_number: number
+  text: string
+  looks_like_blank_field: boolean
+  block_type?: string
+}
+
 export interface PendingTemplateResponse extends TemplateListResponse {
   id: number
   status: string
   source_filename?: string | null
   text_preview?: string | null
+  static_blocks?: StaticBlock[]
 }
 
 export interface PendingTemplateUpdateRequest {
@@ -51,6 +60,7 @@ export interface PendingTemplateUpdateRequest {
   description?: string | null
   specification_number?: string | null
   sections?: TemplateSection[]
+  static_blocks?: StaticBlock[]
 }
 
 export interface ProjectResponse {
@@ -156,6 +166,7 @@ export interface FieldVerificationResponse {
   status: VerificationStatus
   expected_hint?: string | null
   reason?: string | null
+  required?: boolean
 }
 
 export interface CreateExtractionRequest {

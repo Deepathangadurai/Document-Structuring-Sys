@@ -61,6 +61,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             active={location.pathname === '/projects/new'}
           />
           <NavItem to="/templates" label="Templates" icon={Icons.LayoutDashboard} active={location.pathname === '/templates'} />
+          <NavItem to="/doc-editor" label="Document Editor" icon={Icons.Edit} active={location.pathname === '/doc-editor' || location.pathname.includes('/editor') || location.pathname.includes('/report')} />
         </div>
 
         <div className="p-4 border-t border-white/10">
@@ -108,7 +109,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-hidden relative">{children}</main>
+        <main className="flex-1 overflow-y-auto relative">{children}</main>
       </div>
     </div>
   )

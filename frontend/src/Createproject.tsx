@@ -48,6 +48,7 @@ export default function CreateProject() {
   // Step 2 — single source document
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [documentId, setDocumentId] = useState<number | null>(null)
 
   // Step 3 — detected specifications (matched against the 13 master
@@ -83,8 +84,35 @@ export default function CreateProject() {
     if (!file || !projectId) return
     setError(null)
     setUploading(true)
+    setUploadProgress(0)
     try {
-      const document = await uploadDocument(projectId, file)
+      // Use XHR so we can track real upload progress
+      const document = await new Promise<import('./types').DocumentMetadataResponse>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api'
+        xhr.open('POST', `${API_BASE}/projects/${projectId}/documents`)
+        xhr.upload.addEventListener('progress', (ev) => {
+          if (ev.lengthComputable) {
+            setUploadProgress(Math.round((ev.loaded / ev.total) * 100))
+          }
+        })
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText) as import('./types').DocumentMetadataResponse) }
+            catch { reject(new Error('Invalid server response')) }
+          } else {
+            try {
+              const body = JSON.parse(xhr.responseText) as { detail?: string }
+              reject(new Error(body.detail ?? xhr.statusText))
+            } catch { reject(new Error(xhr.statusText)) }
+          }
+        })
+        xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
+        const form = new FormData()
+        form.append('file', file)
+        xhr.send(form)
+      })
+      setUploadProgress(100)
       setDocumentId(document.id)
       setStep(3)
       await runDetection()
@@ -295,16 +323,37 @@ export default function CreateProject() {
                       <p className="text-sm text-slate-500 mt-0.5">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
                     </div>
                   </div>
-                  <div className="flex items-center text-success text-sm font-medium">
-                    <Icons.Check /> <span className="ml-1">Ready</span>
-                  </div>
+                  {uploading ? (
+                    <span className="text-sm font-semibold text-brand">{uploadProgress}%</span>
+                  ) : (
+                    <div className="flex items-center text-success text-sm font-medium">
+                      <Icons.Check /> <span className="ml-1">Ready</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Upload progress bar */}
+                {uploading && (
+                  <div className="mt-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-500">Uploading document…</span>
+                      <span className="text-xs font-semibold text-brand">{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="h-2.5 rounded-full bg-brand transition-all duration-200"
+                        style={{ width: `${Math.max(1, uploadProgress)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-6 flex gap-3 justify-end pt-4 border-t border-slate-100">
                   <Button variant="ghost" onClick={() => setFile(null)} disabled={uploading}>
                     Remove
                   </Button>
                   <Button onClick={handleUploadAndDetect} disabled={uploading}>
-                    {uploading ? 'Uploading...' : 'Upload & Detect Specifications'}
+                    {uploading ? `Uploading… ${uploadProgress}%` : 'Upload & Detect Specifications'}
                   </Button>
                 </div>
               </Card>
@@ -446,14 +495,24 @@ export default function CreateProject() {
                   <p className="text-xs text-danger">{sj.error}</p>
                 ) : (
                   <>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="h-2 rounded-full bg-brand transition-all duration-300"
-                        style={{ width: `${sj.job?.progress ?? 0}%` }}
-                      />
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-500">
+                        Page {sj.job?.current_page ?? 0} of {sj.job?.total_pages ?? 0}
+                      </span>
+                      <span className="text-xs font-semibold text-brand">
+                        {Math.max(sj.job?.status === 'completed' ? 100 : 0, sj.job?.progress ?? 0)}%
+                      </span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-2">
-                      Page {sj.job?.current_page ?? 0} of {sj.job?.total_pages ?? 0}
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="h-2.5 rounded-full bg-brand transition-all duration-500"
+                        style={{
+                          width: `${Math.max(
+                            sj.job?.status === 'completed' ? 100 : 1,
+                            sj.job?.progress ?? 1,
+                          )}%`,
+                        }}
+                      />
                     </div>
                   </>
                 )}
@@ -472,9 +531,17 @@ export default function CreateProject() {
                   {specJobs.length} specification{specJobs.length === 1 ? '' : 's'} processed from {file?.name}.
                 </p>
               </div>
-              <Button onClick={() => navigate(`/projects/${projectId}`)}>
-                Open Project Workspace <Icons.ArrowRight className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}`)}>
+                  Open Project Workspace
+                </Button>
+                <Button
+                  className="bg-[#1A3A6B] hover:bg-[#12294d] text-white shadow-sm flex items-center gap-2"
+                  onClick={() => navigate(`/projects/${projectId}/report`)}
+                >
+                  ✨ Open in Custom Report Editor & Download <Icons.ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

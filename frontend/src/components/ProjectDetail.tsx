@@ -240,7 +240,7 @@ export default function ProjectDetail() {
     } catch (err) {
       setVerifyError(
         `Verification is not available yet: ${(err as Error).message}. This calls a new backend endpoint ` +
-          `(GET /extraction/{jobId}/verify) that still needs to compare extracted values against the matched template's requirements.`,
+        `(GET /extraction/{jobId}/verify) that still needs to compare extracted values against the matched template's requirements.`,
       )
     } finally {
       setVerifying(false)
@@ -288,7 +288,7 @@ export default function ProjectDetail() {
         setEdits((prev) => (prev[fieldId] === text ? prev : { ...prev, [fieldId]: text }))
       }
       span.removeEventListener('input', (span as any).__fieldInputHandler)
-      ;(span as any).__fieldInputHandler = handler
+        ; (span as any).__fieldInputHandler = handler
       span.addEventListener('input', handler)
     })
   }, [edits, extractedByFieldId])
@@ -359,6 +359,41 @@ export default function ProjectDetail() {
     }
   }
 
+  // Save the current (possibly user-edited) value as a pending review item.
+  async function handleSaveEdit(field: ExtractedFieldResponse) {
+    if (!jobForSelectedDocument) return
+    const value = edits[field.field_id] ?? getFieldDisplayValue(field)
+    setSavingFieldId(field.field_id)
+    try {
+      await updateExtractedField(jobForSelectedDocument.id, field.field_id, {
+        value,
+        validation_status: 'review',
+      })
+      setEdits((prev) => {
+        const next = { ...prev }
+        delete next[field.field_id]
+        return next
+      })
+      await loadProject()
+    } catch (err) {
+      setError(`Could not save edit: ${(err as Error).message}`)
+    } finally {
+      setSavingFieldId(null)
+    }
+  }
+
+  // Revert an unsaved in-document edit back to the last saved backend value.
+  async function handleUndo(field: ExtractedFieldResponse) {
+    const savedValue = getFieldDisplayValue(field)
+    setEdits((prev) => {
+      const next = { ...prev }
+      delete next[field.field_id]
+      return next
+    })
+    const span = docRef.current?.querySelector<HTMLElement>(`[data-field-id="${field.field_id}"]`)
+    if (span) span.textContent = savedValue
+  }
+
   if (loading && !project) {
     return <div className="p-8 max-w-6xl mx-auto text-sm text-slate-500">Loading project…</div>
   }
@@ -419,9 +454,8 @@ export default function ProjectDetail() {
                     <li key={job.id}>
                       <button
                         onClick={() => setSelectedJobId(job.id)}
-                        className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${
-                          selectedJobId === job.id ? 'bg-brand-light' : ''
-                        }`}
+                        className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${selectedJobId === job.id ? 'bg-brand-light' : ''
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium text-slate-900 truncate">
@@ -447,9 +481,20 @@ export default function ProjectDetail() {
                   Downloads reflect exactly what's shown in the document on the right, including any
                   approvals/rejections you've made. This specification generates its own separate file.
                 </p>
+                <Button
+                  className="w-full bg-[#1A3A6B] hover:bg-[#12294d] text-white font-semibold py-2.5 shadow-sm flex items-center justify-center gap-2 mb-2"
+                  onClick={() => navigate(`/projects/${projectId}/report`)}
+                >
+                  ✨ Open in Custom Editor &amp; Rovo AI
+                </Button>
                 <a href={getExtractionExportUrl(jobForSelectedDocument.id, 'docx')} className="block">
                   <Button variant="secondary" className="w-full">
                     <Icons.Download className="w-4 h-4" /> Download Word Document
+                  </Button>
+                </a>
+                <a href={getExtractionExportUrl(jobForSelectedDocument.id, 'pdf')} className="block">
+                  <Button variant="secondary" className="w-full">
+                    <Icons.Download className="w-4 h-4" /> Download PDF Report
                   </Button>
                 </a>
                 <a href={getExtractionExportUrl(jobForSelectedDocument.id, 'json')} className="block">
@@ -501,136 +546,139 @@ export default function ProjectDetail() {
               ) : null}
             </Card>
 
-            {/* Field checklist - navigation + approve/reject only. Editing
-                the value itself only ever happens in the document pane;
-                nothing here is a text input. */}
+            {/* Field editor - form style matching extraction form */}
             <Card className="p-4">
-              <h3 className="font-semibold mb-1 text-sm">Values on This Page</h3>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="font-semibold text-sm">Values on This Page</h3>
+                {fieldsOnPage.length > 0 && (
+                  <Badge type={fieldsOnPage.some((f) => !(edits[f.field_id] ?? getFieldDisplayValue(f))) ? 'missing' : 'active'}>
+                    {fieldsOnPage.length}
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-slate-500 mb-3">
-                Edit values directly in the document. Approve or reject each one here.
+                Type a value below or click ↗ to jump to it in the document. Approve ✓ or reject ✕ when done.
               </p>
               {!jobForSelectedDocument ? (
                 <p className="text-slate-500 text-sm">No extraction job for this document yet.</p>
               ) : fieldsOnPage.length === 0 ? (
-                <p className="text-slate-500 text-sm">No values detected on this page.</p>
+                <p className="text-xs text-slate-400">No fields detected on this page.</p>
               ) : (
-                <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                   {fieldsOnPage.map((field) => {
                     const isSaving = savingFieldId === field.field_id
                     const currentValue = edits[field.field_id] ?? getFieldDisplayValue(field)
                     const verdict = verifyByFieldId[field.field_id]
                     const def = enrichedDefs[field.field_id]
-                    const match = def ? matchIndicator(currentValue, def.default_value) : null
+                    const isMissing = !currentValue
+                    const isReview = verdict && verdict.status !== 'match'
                     return (
                       <div
                         key={field.field_id}
-                        className={`rounded border p-2.5 transition-colors ${
-                          match?.icon === '✓' ? 'border-green-200 bg-green-50/40 hover:border-green-400'
-                          : match?.icon === '≠' && currentValue ? 'border-amber-200 bg-amber-50/30 hover:border-amber-400'
-                          : !currentValue ? 'border-red-200 bg-red-50/30 hover:border-red-400'
-                          : 'border-slate-200 bg-white hover:border-brand'
+                        className={`rounded-md border p-3 transition-colors ${
+                          isMissing
+                            ? 'border-red-200 bg-red-50/40'
+                            : isReview
+                            ? 'border-amber-200 bg-amber-50/40'
+                            : 'border-slate-200 bg-slate-50/60'
                         }`}
                       >
-                        {/* Field name + jump to doc */}
-                        <button
-                          type="button"
-                          onClick={() => focusField(field.field_id)}
-                          className="w-full text-left group"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-slate-900 text-xs flex-1">{field.field_label}</span>
+                        {/* Header row: label + badge + jump */}
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <label className="text-xs font-semibold text-slate-800 truncate">
+                              {field.field_label}
+                              {def?.required && <span className="text-red-600 ml-0.5">*</span>}
+                            </label>
                             {def?.clause_ref && (
                               <span className="text-[9px] font-mono bg-amber-100 text-amber-700 rounded px-1 py-px shrink-0">§ {def.clause_ref}</span>
                             )}
-                            <span className="text-[10px] text-slate-300 group-hover:text-brand transition-colors">↗</span>
                           </div>
-                        </button>
-
-                        {/* Extracted vs Expected side-by-side */}
-                        <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-[10px]">
-                          <div>
-                            <span className="text-slate-400 uppercase tracking-wide font-semibold block mb-0.5">Template Default</span>
-                            <span className="text-slate-500 font-mono bg-slate-100 rounded px-1.5 py-1 block truncate leading-tight" title={def?.default_value || '—'}>
-                              {def?.default_value || <span className="italic text-slate-300">—</span>}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 uppercase tracking-wide font-semibold block mb-0.5">Extracted</span>
-                            <span
-                              className={`font-mono rounded px-1.5 py-1 block truncate leading-tight ${
-                                currentValue
-                                  ? 'text-slate-900 bg-white border border-slate-200'
-                                  : 'text-red-400 italic bg-red-50 border border-red-200'
-                              }`}
-                              title={currentValue || '(not extracted)'}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Badge type={field.validation_status}>{field.validation_status}</Badge>
+                            {verdict && (
+                              <Badge type={verifyBadgeType(verdict.status)} title={verdict.reason ?? undefined}>
+                                {verifyLabel(verdict.status)}
+                              </Badge>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => focusField(field.field_id)}
+                              className="text-[11px] text-brand hover:underline shrink-0"
+                              title="Jump to this field in the document"
                             >
-                              {currentValue || '(not extracted)'}
-                            </span>
+                              ↗
+                            </button>
                           </div>
                         </div>
 
-                        {/* Match indicator bar */}
-                        {match && (
-                          <div className={`mt-1.5 flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 font-medium ${match.color}`}>
-                            <span>{match.icon}</span>
-                            <span>{match.label}</span>
-                          </div>
-                        )}
-                        {!currentValue && (
-                          <div className="mt-1.5 flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 font-medium text-red-600 bg-red-50">
-                            <span>⚠</span>
-                            <span>{def?.required ? 'Required field — value not extracted' : 'Value not found in document'}</span>
-                          </div>
+                        {/* Hint / reason */}
+                        {(verdict?.reason || def?.extraction_hint) && (
+                          <p className="text-[11px] text-slate-500 mb-1.5">
+                            {verdict?.reason ?? def?.extraction_hint}
+                          </p>
                         )}
 
-                        {/* Status badges + action buttons */}
-                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                          <Badge type={field.validation_status}>{field.validation_status}</Badge>
-                          {edits[field.field_id] !== undefined && edits[field.field_id] !== getFieldDisplayValue(field) ? (
-                            <span className="text-[10px] font-medium text-amber-600" title="Typed in the document but not yet saved">unsaved</span>
-                          ) : null}
-                          {verdict ? (
-                            <Badge type={verifyBadgeType(verdict.status)} title={verdict.reason ?? undefined}>
-                              {verifyLabel(verdict.status)}
-                            </Badge>
-                          ) : null}
-                          {field.confidence != null ? (
-                            <span className="text-[10px] text-slate-400" title="AI extraction confidence">{Math.round(field.confidence * 100)}% conf</span>
-                          ) : null}
+                        {/* Editable textarea */}
+                        <textarea
+                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20 resize-none"
+                          rows={currentValue && currentValue.length > 60 ? 3 : 1}
+                          placeholder={isMissing ? 'Not found — enter value manually' : 'Edit value…'}
+                          value={currentValue}
+                          disabled={isSaving}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setEdits((prev) => ({ ...prev, [field.field_id]: val }))
+                            const span = docRef.current?.querySelector<HTMLElement>(`[data-field-id="${field.field_id}"]`)
+                            if (span) span.textContent = val
+                          }}
+                        />
+
+                        {/* Action row */}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {field.confidence != null && (
+                            <span className="text-[10px] text-slate-400">{Math.round(field.confidence * 100)}% conf</span>
+                          )}
                           <div className="flex-1" />
-                          {field.original_value !== undefined && field.original_value !== null &&
-                            (currentValue !== field.original_value || field.validation_status !== 'pending') ? (
-                            <button disabled={isSaving} onClick={() => void handleUndo(field)}
+                          {edits[field.field_id] !== undefined && edits[field.field_id] !== getFieldDisplayValue(field) && (
+                            <button
+                              type="button"
+                              disabled={isSaving}
                               className="text-slate-500 hover:text-slate-700 disabled:opacity-30"
-                              title={`Undo back to original: "${field.original_value}"`}>
-                              <Icons.Undo className="w-4 h-4" />
+                              title="Undo unsaved edit"
+                              onClick={() => void handleUndo(field)}
+                            >
+                              <Icons.Undo className="w-3.5 h-3.5" />
                             </button>
-                          ) : null}
-                          <button disabled={isSaving || edits[field.field_id] === undefined}
+                          )}
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            className="text-[11px] font-medium text-slate-500 hover:text-slate-700 disabled:opacity-30 px-2 py-0.5 rounded border border-slate-200 hover:border-slate-400 transition-colors"
+                            title="Save for review"
                             onClick={() => void handleSaveEdit(field)}
-                            className="text-amber-600 hover:text-amber-700 disabled:opacity-30"
-                            title="Save edit for review">
-                            <Icons.Edit className="w-4 h-4" />
+                          >
+                            Save
                           </button>
-                          <button disabled={isSaving} onClick={() => void handleApprove(field)}
+                          <button
+                            type="button"
+                            disabled={isSaving}
                             className="text-green-600 hover:text-green-700 disabled:opacity-40"
-                            title="Approve this value">
+                            title="Approve this value"
+                            onClick={() => void handleApprove(field)}
+                          >
                             <Icons.Check className="w-4 h-4" />
                           </button>
-                          <button disabled={isSaving} onClick={() => void handleReject(field)}
+                          <button
+                            type="button"
+                            disabled={isSaving}
                             className="text-red-600 hover:text-red-700 disabled:opacity-40"
-                            title="Reject and clear this value">
+                            title="Reject and clear this value"
+                            onClick={() => void handleReject(field)}
+                          >
                             <Icons.X className="w-4 h-4" />
                           </button>
                         </div>
-
-                        {/* Extraction hint */}
-                        {def?.extraction_hint && (
-                          <details className="text-[10px] mt-1.5">
-                            <summary className="cursor-pointer text-slate-400 hover:text-blue-600 select-none">🤖 How AI extracted this</summary>
-                            <p className="mt-1 text-slate-500 bg-slate-50 rounded p-1.5 leading-relaxed">{def.extraction_hint}</p>
-                          </details>
-                        )}
                       </div>
                     )
                   })}
@@ -679,7 +727,7 @@ export default function ProjectDetail() {
                 ) : null}
               </div>
 
-              <div className="p-6">
+              <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 12rem)' }}>
                 {jobForSelectedDocument?.status === 'processing' || jobForSelectedDocument?.status === 'pending' ? (
                   <div className="p-8 text-center">
                     <div className="w-6 h-6 mx-auto rounded-full border-2 border-brand border-t-transparent animate-spin mb-3" />

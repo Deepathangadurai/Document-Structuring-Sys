@@ -1,10 +1,11 @@
 import tempfile
+import threading
 from pathlib import Path
 from typing import cast
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
-from app.db.database import get_db
+from app.db.database import get_db, SessionLocal
 from app.services.extraction_service import ExtractionService, ProjectService
 from app.services.template_service import TemplateService
 from app.services.verification_service import VerificationService
@@ -19,6 +20,29 @@ from app.db.schemas import (
 router = APIRouter()
 
 ALLOWED_VALIDATION_STATUSES = {"pending", "verified", "missing", "review", "rejected"}
+
+
+def _run_extraction_in_thread(job_id: int) -> None:
+    """Run process_job in a dedicated daemon thread with its own DB session.
+
+    FastAPI's BackgroundTasks runs the callable on the same event loop /
+    thread that served the request, and reuses the *request's* DB session.
+    That has two problems for a long-running extraction job:
+
+    1. The request's Session is not thread-safe and may already be closed by
+       the time a background task uses it.
+    2. Every DB commit inside process_job holds SQLite's write lock; other
+       API requests (status polls, page loads) that also write block until
+       the commit finishes - making the server appear completely frozen.
+
+    Running in a proper daemon thread with its own SessionLocal fixes both:
+    the session is owned and closed by this thread alone, and WAL mode
+    (enabled in database.py) lets readers continue in parallel with writes.
+    """
+    with SessionLocal() as db:
+        service = ExtractionService(db)
+        service.process_job(job_id)
+
 
 @router.post("/projects/{project_id}/extract", response_model=ExtractionJobResponse)
 def start_extraction(project_id: int, payload: CreateExtractionRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -51,9 +75,23 @@ def start_extraction(project_id: int, payload: CreateExtractionRequest, backgrou
 
     # Use cast to inform Pyright that job.id is an integer at runtime
     job_id = cast(int, job.id)
-    background_tasks.add_task(extraction_service.process_job, job_id)
+
+    # Spawn a daemon thread so extraction runs completely independently of
+    # this request/response cycle. The thread gets its own DB session (see
+    # _run_extraction_in_thread) so it never contends with the request
+    # session for the write lock. daemon=True means the thread won't prevent
+    # the server process from exiting if the server is stopped mid-job (the
+    # startup recovery logic in main.py handles that case).
+    thread = threading.Thread(
+        target=_run_extraction_in_thread,
+        args=(job_id,),
+        daemon=True,
+        name=f"extraction-job-{job_id}",
+    )
+    thread.start()
 
     return extraction_service.get_job_results(job)
+
 
 @router.get("/extraction/{job_id}", response_model=ExtractionJobResponse)
 def get_extraction(job_id: int, db: Session = Depends(get_db)):
@@ -127,7 +165,26 @@ def export_extraction(job_id: int, format: str = "json", db: Session = Depends(g
             filename=f"extraction_{job_id}.docx",
         )
 
-    raise HTTPException(status_code=400, detail="format must be 'json' or 'docx'")
+    if format == "pdf":
+        from app.services.document_export_service import DocumentExportService
+        tmp_dir = tempfile.mkdtemp()
+        docx_output_path = Path(tmp_dir) / f"extraction_{job_id}.docx"
+        extraction_service.export_as_docx(job, str(docx_output_path))
+        try:
+            pdf_path = DocumentExportService.convert_docx_to_pdf(str(docx_output_path))
+            return FileResponse(
+                str(pdf_path),
+                media_type="application/pdf",
+                filename=f"extraction_{job_id}.pdf",
+            )
+        except Exception:
+            return FileResponse(
+                str(docx_output_path),
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                filename=f"extraction_{job_id}.docx",
+            )
+
+    raise HTTPException(status_code=400, detail="format must be 'json', 'docx', or 'pdf'")
 
 @router.patch("/extraction/{job_id}/fields/{field_id}", response_model=ExtractedFieldResponse)
 def update_extracted_field(job_id: int, field_id: str, payload: FieldUpdateRequest, db: Session = Depends(get_db)):

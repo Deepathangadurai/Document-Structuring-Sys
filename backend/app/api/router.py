@@ -8,6 +8,7 @@ from app.api.documents import router as documents_router
 from app.api.extraction import router as extraction_router
 from app.api.model import router as model_router
 from app.api.dashboard import router as dashboard_router
+from app.api.ai import router as ai_router
 import sqlalchemy
 
 router = APIRouter()
@@ -18,6 +19,7 @@ router.include_router(documents_router, prefix="", tags=["documents"])
 router.include_router(extraction_router, prefix="", tags=["extraction"])
 router.include_router(model_router, prefix="", tags=["model"])
 router.include_router(dashboard_router, prefix="", tags=["dashboard"])
+router.include_router(ai_router, prefix="", tags=["ai"])
 
 @router.get("/health")
 async def api_health():
