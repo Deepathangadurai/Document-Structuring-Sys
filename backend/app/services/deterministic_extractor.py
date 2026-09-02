@@ -70,19 +70,15 @@ _LABEL_VALUE_SPLIT = re.compile(r"(?::\s*| - )(.*)", re.DOTALL)
 
 def _build_label_regex(patterns: list[str]) -> re.Pattern[str]:
     """
-    Build a single compiled regex that matches any of the *patterns*
-    immediately followed by an optional colon or dash separator, then
-    captures the rest of the line as the value.
-
-    Input patterns are literal strings; we re.escape them so special
-    characters in engineering labels (brackets, slashes, '&', etc.) are
-    matched verbatim.
+    Build a compiled regex that matches any of the *patterns* (with or without
+    trailing colons/dashes), optionally followed by separator characters,
+    capturing any remaining value on the line.
     """
-    escaped = [re.escape(p) for p in patterns]
+    escaped = [re.escape(p.rstrip(":").strip()) for p in patterns if p.strip()]
+    if not escaped:
+        escaped = [r"\b\B"]
     combined = "|".join(escaped)
-    # The separator can be: ' :' / ': ' / ':' / ' - ' (colon variants most
-    # common in the engineering spec format "Label : Value")
-    pattern = rf"(?:{combined})\s*[:\-]\s*(.+)"
+    pattern = rf"(?:{combined})\s*[:\-]?\s*(.*)"
     return re.compile(pattern, re.IGNORECASE)
 
 
@@ -122,12 +118,132 @@ def _fuzzy_score(candidate: str, patterns: list[str]) -> float:
 # Core extraction methods
 # ---------------------------------------------------------------------------
 
+def _build_section_lines_map(
+    schema: dict[str, Any],
+    pages: list[dict[str, Any]],
+) -> dict[str, list[tuple[int, str]]]:
+    """
+    Build section_id -> list of (page_num, line_text) for each section in schema.
+    Uses section_number (e.g. '2.2', '4.1.1') as primary anchor on document lines.
+    """
+    sections = schema.get("sections", [])
+    section_ids = [s.get("section_id", "") for s in sections]
+    section_lines: dict[str, list[tuple[int, str]]] = {sid: [] for sid in section_ids}
+
+    # Flatten all lines from pages: list of (page_num, line)
+    all_lines: list[tuple[int, str]] = []
+    for page in pages:
+        p_num = page.get("page_number", 1)
+        text = page.get("text") or ""
+        for line in text.splitlines():
+            line_str = line.strip()
+            if line_str:
+                all_lines.append((p_num, line_str))
+
+    # Detect section boundaries
+    detect_list = []
+    for sec in sections:
+        sid = sec.get("section_id", "")
+        snum = str(sec.get("section_number", "")).strip().rstrip(".")
+        sname = sec.get("section_name", "").strip()
+        keywords = [w.lower() for w in sname.split() if len(w) > 3]
+        detect_list.append((sid, snum, keywords))
+
+    heading_positions: list[tuple[int, str]] = []
+    detected_sids: set[str] = set()
+
+    for l_idx, (p_num, line_str) in enumerate(all_lines):
+        if len(line_str) > 150:
+            continue
+        text_stripped = line_str.lstrip("\t ").rstrip()
+        text_lower = line_str.lower()
+
+        for sid, snum, keywords in detect_list:
+            if sid in detected_sids:
+                continue
+
+            matched = False
+            if snum:
+                if re.match(rf"^{re.escape(snum)}[.\s\t]", text_stripped) or text_stripped.startswith(snum + "\t"):
+                    matched = True
+            else:
+                if keywords:
+                    hits = sum(1 for kw in keywords if kw in text_lower)
+                    if hits >= max(1, len(keywords) // 2):
+                        matched = True
+
+            if matched:
+                heading_positions.append((l_idx, sid))
+                detected_sids.add(sid)
+                break
+
+    if not heading_positions:
+        for sid in section_lines:
+            section_lines[sid] = all_lines
+        return section_lines
+
+    n_lines = len(all_lines)
+    for pos, (start_idx, sid) in enumerate(heading_positions):
+        end_idx = heading_positions[pos + 1][0] if pos + 1 < len(heading_positions) else n_lines
+        section_lines[sid] = all_lines[start_idx:end_idx]
+
+    for sid in section_lines:
+        if not section_lines[sid]:
+            section_lines[sid] = all_lines
+
+    return section_lines
+
+
+_CLAUSE_START = re.compile(r"^(?:[a-z]\)|[0-9]+(?:\.[0-9]+)+|\t*[a-z]\))\s+", re.IGNORECASE)
+
+
+def _exact_scan(lines_seq: list[tuple[int, str]], exact_re: re.Pattern[str], field_id: str, field_label: str) -> dict[str, Any] | None:
+    n_seq = len(lines_seq)
+    for i, (page_num, line) in enumerate(lines_seq):
+        if not line:
+            continue
+        m = exact_re.search(line)
+        if m:
+            value = m.group(1).strip()
+            if value.startswith(":") or value.startswith("-"):
+                value = value.lstrip(":-").strip()
+
+            # If value starts with a clause header (e.g. "b) Service"), ignore same-line match
+            if value and _CLAUSE_START.match(value):
+                value = ""
+
+            # If no value on current line, look ahead to next lines for multiline labels
+            if not value and i + 1 < n_seq:
+                next_l = lines_seq[i + 1][1].lstrip(":-").strip()
+                if next_l and not _CLAUSE_START.match(next_l):
+                    value = next_l
+                elif not next_l and i + 2 < n_seq:
+                    next_l2 = lines_seq[i + 2][1].lstrip(":-").strip()
+                    if next_l2 and not _CLAUSE_START.match(next_l2):
+                        value = next_l2
+
+            if value:
+                return {
+                    "field_id": field_id,
+                    "field_name": field_label,
+                    "value": value,
+                    "confidence": CONFIDENCE_EXACT,
+                    "source": {
+                        "page_number": page_num,
+                        "source_text": line,
+                        "confidence": CONFIDENCE_EXACT,
+                    },
+                }
+    return None
+
+
 def _scan_text_field(
     field: dict[str, Any],
     pages: list[dict[str, Any]],
+    section_lines: list[tuple[int, str]] | None = None,
 ) -> dict[str, Any]:
     """
-    Scan every line of every page for *field*.
+    Scan for *field*. Searches *section_lines* first if provided, then *pages*.
 
     Returns a result dict with value / confidence / source filled in.
     """
@@ -138,45 +254,39 @@ def _scan_text_field(
     # Build exact-match regex once per field
     exact_re = _build_label_regex(patterns)
 
-    # Pass 1 — exact regex match
+    # Flatten pages into (page_num, line) tuples for fallback
+    all_lines: list[tuple[int, str]] = []
     for page in pages:
-        page_num = page.get("page_number", 0)
-        text = page.get("text") or ""
-        for line in text.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            m = exact_re.match(line)
-            if m:
-                value = m.group(1).strip()
-                if value:
-                    return {
-                        "field_id": field_id,
-                        "field_name": field_label,
-                        "value": value,
-                        "confidence": CONFIDENCE_EXACT,
-                        "source": {
-                            "page_number": page_num,
-                            "source_text": line,
-                            "confidence": CONFIDENCE_EXACT,
-                        },
-                    }
+        p_num = page.get("page_number", 0)
+        t = page.get("text") or ""
+        for line in t.splitlines():
+            ls = line.strip()
+            if ls:
+                all_lines.append((p_num, ls))
 
-    # Pass 2 — fuzzy match (best across all pages)
+    # Pass 1a — exact regex match within candidate section lines
+    if section_lines:
+        res = _exact_scan(section_lines, exact_re, field_id, field_label)
+        if res:
+            return res
+
+    # Pass 1b — exact regex match across all document lines (fallback)
+    res = _exact_scan(all_lines, exact_re, field_id, field_label)
+    if res:
+        return res
+
+    # Pass 2 — fuzzy match
     if not _HAS_RAPIDFUZZ:
         logger.debug("rapidfuzz not available; skipping fuzzy pass for %s", field_id)
     else:
-        best_score = 0.0
-        best_value: str | None = None
-        best_line: str | None = None
-        best_page: int | None = None
+        def _fuzzy_scan(lines_seq: list[tuple[int, str]]) -> tuple[float, str | None, str | None, int | None]:
+            best_score = 0.0
+            best_value: str | None = None
+            best_line: str | None = None
+            best_page: int | None = None
 
-        for page in pages:
-            page_num = page.get("page_number", 0)
-            text = page.get("text") or ""
-            for line in text.splitlines():
-                line = line.strip()
-                if not line or ":" not in line and " - " not in line:
+            for page_num, line in lines_seq:
+                if not line or (":" not in line and " - " not in line):
                     continue
                 candidate_label = _extract_line_label(line)
                 if len(candidate_label) < 3:
@@ -190,8 +300,19 @@ def _scan_text_field(
                         best_line = line
                         best_page = page_num
 
+            return best_score, best_value, best_line, best_page
+
+        # Try section lines first
+        if section_lines:
+            best_score, best_value, best_line, best_page = _fuzzy_scan(section_lines)
+        else:
+            best_score, best_value, best_line, best_page = 0.0, None, None, None
+
+        # Fallback to all lines if not found
+        if best_value is None:
+            best_score, best_value, best_line, best_page = _fuzzy_scan(all_lines)
+
         if best_value is not None:
-            # Map the raw score (85–100) onto CONFIDENCE_FUZZY_MIN–CONFIDENCE_FUZZY_MAX
             normalised = CONFIDENCE_FUZZY_MIN + (
                 (best_score - FUZZY_THRESHOLD) / (100.0 - FUZZY_THRESHOLD)
             ) * (CONFIDENCE_FUZZY_MAX - CONFIDENCE_FUZZY_MIN)
@@ -370,22 +491,25 @@ class DeterministicExtractor:
             }
         """
         all_fields: list[dict[str, Any]] = []
+        section_lines_map = _build_section_lines_map(schema, pages)
 
         for section in schema.get("sections", []):
             is_table = section.get("field_type") == "table"
+            sec_id = section.get("section_id", "")
+            sec_lines = section_lines_map.get(sec_id)
 
             if is_table:
                 # Content-anchored table row scan
                 table_results = _scan_table_section(section, table_rows_by_page)
                 all_fields.extend(table_results)
             else:
-                # Whole-document label scan for each text field
+                # Section-scoped (with fallback) label scan for each text field
                 for field in section.get("fields", []):
                     if not field.get("is_dynamic", True):
                         # Static (non-dynamic) fields are seeded separately;
                         # don't extract them.
                         continue
-                    result = _scan_text_field(field, pages)
+                    result = _scan_text_field(field, pages, section_lines=sec_lines)
                     all_fields.append(result)
 
         logger.info(

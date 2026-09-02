@@ -9,18 +9,15 @@ import TemplatePending from './components/TemplatePending'
 import TemplateReview from './components/TemplateReview'
 import TemplatePageReview from './components/TemplatePageReview'
 
-// 1. Fix CreateProject import to target Createproject.. directly in src/
-import CreateProject from "./Createproject";
+import CreateProject from "./Createproject"
 import ProjectDetail from './components/ProjectDetail'
 import JiraFieldEditor from './components/JiraFieldEditor'
-
 
 export default function App() {
   return (
     <Routes>
-      {/* Jira-style field editor — full-screen, no AppShell chrome */}
+      {/* Jira-style field editor — full-screen manual field edit view */}
       <Route path="/projects/:projectId/edit/:jobId" element={<JiraFieldEditor />} />
-
 
       {/* AppShell Wrapped Views */}
       <Route

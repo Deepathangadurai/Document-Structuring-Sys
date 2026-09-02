@@ -141,4 +141,49 @@ body {
   100% {
     box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.15);
   }
+}
+
+/* Document Preview Paper Sheet Styling */
+.doc-preview-paper {
+  box-sizing: border-box;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #1e293b;
+}
+
+.doc-preview-paper table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 1rem 0 !important;
+  table-layout: fixed !important;
+}
+
+.doc-preview-paper td,
+.doc-preview-paper th {
+  border: 1px solid #cbd5e1 !important;
+  padding: 8px 12px !important;
+  vertical-align: top !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  word-break: break-word !important;
+}
+
+.doc-preview-paper th {
+  background-color: #f8fafc !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+
+.doc-preview-paper p {
+  margin-bottom: 0.75rem !important;
+  line-height: 1.6 !important;
+}
+
+.doc-preview-paper h1,
+.doc-preview-paper h2,
+.doc-preview-paper h3,
+.doc-preview-paper h4 {
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.5rem !important;
 }

@@ -631,18 +631,38 @@ class ExtractionService:
         template_docx = None
 
         schema_data = template.schema if isinstance(template.schema, dict) else {}
-        file_name_hint = schema_data.get("file_name") or ""
+        file_name_hint = schema_data.get("file_name") or getattr(template, "file_name", "") or ""
         if file_name_hint:
             candidate = template_dir / file_name_hint
             if candidate.exists() and candidate.suffix.lower() in (".docx", ".doc"):
                 template_docx = candidate
 
-        if template_docx is None:
+        if template_docx is None and template_dir.exists():
             for pattern in ("*.docx", "*.DOCX", "*.doc", "*.DOC"):
-                matches = sorted(template_dir.glob(pattern)) if template_dir.exists() else []
+                matches = sorted(template_dir.glob(pattern))
                 if matches:
                     template_docx = matches[0]
                     break
+
+        # Fallback: check pending_storage_path (/storage/pending_templates/) for uploaded templates
+        if template_docx is None:
+            pending_dir = Path(settings.STORAGE_PATH) / "pending_templates"
+            pending_candidate = None
+            if file_name_hint and (pending_dir / file_name_hint).exists():
+                pending_candidate = pending_dir / file_name_hint
+            elif getattr(template, "file_name", None) and (pending_dir / template.file_name).exists():
+                pending_candidate = pending_dir / template.file_name
+
+            if pending_candidate and pending_candidate.suffix.lower() in (".docx", ".doc"):
+                template_dir.mkdir(parents=True, exist_ok=True)
+                dest_docx = template_dir / pending_candidate.name
+                try:
+                    shutil.copy2(pending_candidate, dest_docx)
+                    template_docx = dest_docx
+                    logger.info(f"Auto-healed master template: copied {pending_candidate} to {dest_docx}")
+                except Exception as exc:
+                    logger.warning(f"Could not copy pending template file to {dest_docx}: {exc}")
+                    template_docx = pending_candidate
 
         if not template_docx or not template_docx.exists():
             # Master template file not found - generate fallback table

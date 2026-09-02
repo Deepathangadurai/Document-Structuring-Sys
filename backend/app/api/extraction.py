@@ -186,6 +186,106 @@ def export_extraction(job_id: int, format: str = "json", db: Session = Depends(g
 
     raise HTTPException(status_code=400, detail="format must be 'json', 'docx', or 'pdf'")
 
+
+@router.get("/extraction/{job_id}/preview/pdf")
+def preview_extraction_pdf(job_id: int, db: Session = Depends(get_db)):
+    """Stream the true PDF export of the final populated document for inline viewing."""
+    from app.services.document_export_service import DocumentExportService
+
+    extraction_service = ExtractionService(db)
+    job = extraction_service.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Extraction job not found")
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail="Extraction job has not completed yet")
+
+    tmp_dir = tempfile.mkdtemp()
+    docx_output_path = Path(tmp_dir) / f"extraction_{job_id}.docx"
+    extraction_service.export_as_docx(job, str(docx_output_path))
+    try:
+        pdf_path = DocumentExportService.convert_docx_to_pdf(str(docx_output_path))
+        return FileResponse(
+            pdf_path,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="preview_{job_id}.pdf"'},
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF preview generation failed: {exc}")
+
+
+@router.get("/extraction/{job_id}/preview/page/{page_number}")
+def preview_extraction_page_image(job_id: int, page_number: int, db: Session = Depends(get_db)):
+    """
+    Render a specific page of the final populated PDF output as a high-resolution PNG image.
+    This guarantees a 100% exact match with the downloaded PDF/DOCX file.
+    """
+    import fitz  # PyMuPDF
+    from app.services.document_export_service import DocumentExportService
+
+    extraction_service = ExtractionService(db)
+    job = extraction_service.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Extraction job not found")
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail="Extraction job has not completed yet")
+
+    tmp_dir = tempfile.mkdtemp()
+    docx_output_path = Path(tmp_dir) / f"extraction_{job_id}.docx"
+    extraction_service.export_as_docx(job, str(docx_output_path))
+    try:
+        pdf_path = DocumentExportService.convert_docx_to_pdf(str(docx_output_path))
+        pdf_doc = fitz.open(pdf_path)
+        total_pages = len(pdf_doc)
+        if page_number < 1 or page_number > total_pages:
+            pdf_doc.close()
+            raise HTTPException(status_code=404, detail=f"Page {page_number} out of range (total pages: {total_pages})")
+
+        page = pdf_doc[page_number - 1]
+        mat = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI
+        pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB, alpha=False)
+        img_output_path = Path(tmp_dir) / f"page_{page_number}.png"
+        pix.save(str(img_output_path))
+        pdf_doc.close()
+
+        return FileResponse(
+            str(img_output_path),
+            media_type="image/png",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "X-Total-Pages": str(total_pages),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to render page image: {exc}")
+
+
+@router.get("/extraction/{job_id}/preview/info")
+def preview_extraction_info(job_id: int, db: Session = Depends(get_db)):
+    """Get metadata (total pages) for the true rendered PDF output document."""
+    import fitz
+    from app.services.document_export_service import DocumentExportService
+
+    extraction_service = ExtractionService(db)
+    job = extraction_service.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Extraction job not found")
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail="Extraction job has not completed yet")
+
+    try:
+        tmp_dir = tempfile.mkdtemp()
+        docx_output_path = Path(tmp_dir) / f"extraction_{job_id}.docx"
+        extraction_service.export_as_docx(job, str(docx_output_path))
+        pdf_path = DocumentExportService.convert_docx_to_pdf(str(docx_output_path))
+        pdf_doc = fitz.open(pdf_path)
+        total_pages = len(pdf_doc)
+        pdf_doc.close()
+        return {"job_id": job_id, "total_pages": total_pages}
+    except Exception as exc:
+        return {"job_id": job_id, "total_pages": job.total_pages, "error": str(exc)}
+
 @router.patch("/extraction/{job_id}/fields/{field_id}", response_model=ExtractedFieldResponse)
 def update_extracted_field(job_id: int, field_id: str, payload: FieldUpdateRequest, db: Session = Depends(get_db)):
     if payload.validation_status not in ALLOWED_VALIDATION_STATUSES:

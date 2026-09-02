@@ -627,9 +627,39 @@ class TemplateService:
         has_disk_folder = (self.template_base_path / current_template_id).is_dir()
         if not has_disk_folder:
             final_id = self._unique_template_id(cast(str, getattr(template, "template_name")), exclude_id=cast(int, template.id))
+
+            # The uploaded master .docx currently lives in pending_storage_path
+            # (storage/pending_templates/{uuid}.docx), not under /templates/.
+            # Export (extraction_service.export_as_docx) looks the master file
+            # up via `template_base_path / template.template_id`, so without
+            # copying the file over now, that lookup always misses and export
+            # silently falls back to the generic non-templated table export
+            # for every template approved through the upload flow.
+            stored_filename = cast(str, getattr(template, "file_name"))
+            source_path = self.pending_storage_path / stored_filename if stored_filename else None
+            if source_path and source_path.exists():
+                target_dir = self.template_base_path / final_id
+                target_dir.mkdir(parents=True, exist_ok=True)
+                dest_path = target_dir / source_path.name
+                shutil.copy2(source_path, dest_path)
+                # Record the exact on-disk filename so extraction_service's
+                # file_name hint lookup finds it directly (it also has a
+                # glob fallback, but this keeps behavior explicit/fast).
+                schema_data["file_name"] = dest_path.name
+            else:
+                # Nothing to copy - export will fall back to the table
+                # export and log a warning, same as before this fix.
+                print(
+                    f"[template_service] approve_pending_template: source file "
+                    f"{source_path} not found for template {template.id}; "
+                    "master template will be missing after approval",
+                    flush=True,
+                )
+
             setattr(template, "template_id", final_id)
             schema_data["template_id"] = final_id
             setattr(template, "schema", schema_data)
+            flag_modified(template, "schema")
         setattr(template, "is_active", True)
         setattr(template, "status", "active")
         self.db.add(template)

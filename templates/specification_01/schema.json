@@ -4,7 +4,7 @@
   "version": "2.0",
   "specification_number": "IP009-43-00-01-0",
   "description": "Master template definition for Specification 01 - Electrical Design Basis, Pashmina Project, Momentive Performance Materials, Chennai. Restructured to mirror the document's actual clause hierarchy (Sections 2-8) and to capture every project-specific (red-highlighted) dynamic field/value in the source .docx, instead of only the cover-page fields.",
-  "file_name": "IP009-43-00-01-0.doc",
+  "file_name": "IP009-43-00-01-0.docx",
   "structure_locked": true,
   "field_marking_convention": "In the source Word document, every project-specific / fill-in value is marked with RED HIGHLIGHT (character shading), distinguishing it from the fixed boilerplate specification text. Each 'field' below corresponds 1:1 to one red-highlighted run of text, referenced by its clause number. Repeating tables (cable sizing, voltage drops, illumination levels) are modeled as field_type: 'table' with explicit rows since their red-highlighted content is tabular, not a single label:value pair. Table sections are row-editable (rows_editable: true): rows can be added or deleted to match whatever rows actually exist in a given revision of the document -- the 'rows' array is a seed/current snapshot, not a fixed count.",
   "sections": [
