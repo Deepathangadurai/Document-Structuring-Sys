@@ -28,6 +28,10 @@ class Template(Base):
     # Structure signature: JSON containing page count, table structure, etc.
     # Used to validate that generated documents maintain the same layout as master template
     structure_signature = Column(JSON, nullable=True)
+    # Canonical block-tree representation of the master .docx, built once by
+    # BlockTreeService.parse_docx() at template-sync time.  Stored here so
+    # extraction jobs can clone it without re-parsing the file on every run.
+    block_tree = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -68,6 +72,11 @@ class Document(Base):
     file_size = Column(Integer, nullable=False)
     page_count = Column(Integer, default=0, nullable=False)
     upload_status = Column(String, nullable=False, default="uploaded")
+    # Block-tree produced by BlockTreeService after document ingestion.
+    # For PDFs: parsed via PyMuPDF text blocks; for .docx: parsed via python-docx.
+    # Stored as JSON so the extraction job can run section-to-section alignment
+    # without re-parsing the file.
+    block_tree = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     project = relationship("Project", back_populates="documents")
@@ -98,6 +107,11 @@ class ExtractionJob(Base):
     current_page = Column(Integer, nullable=False, default=0)
     total_pages = Column(Integer, nullable=False, default=0)
     error_message = Column(Text, nullable=True)
+    # Populated block-tree: master tree clone with matched dynamic field values
+    # substituted in from the uploaded document.  This is the single source of
+    # truth for JiraFieldEditor — the relational extracted_fields rows are a
+    # secondary flat index kept for backward-compatible dashboard queries.
+    populated_tree = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)

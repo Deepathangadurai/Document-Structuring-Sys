@@ -107,6 +107,25 @@ def run_startup_migrations(bind_engine=None) -> None:
             # correct - static rows are a new concept only created from now on.
             statements.append("ALTER TABLE extracted_fields ADD COLUMN is_dynamic BOOLEAN NOT NULL DEFAULT TRUE")
 
+    # Block-tree columns — added for the block-tree extraction pipeline.
+    # templates.block_tree      : canonical tree parsed from master .docx
+    # documents.block_tree      : tree parsed from each uploaded document
+    # extraction_jobs.populated_tree : master tree clone with extracted values
+    if "templates" in inspector.get_table_names():
+        tmpl_cols = {col["name"] for col in inspector.get_columns("templates")}
+        if "block_tree" not in tmpl_cols:
+            statements.append("ALTER TABLE templates ADD COLUMN block_tree JSON")
+
+    if "documents" in inspector.get_table_names():
+        doc_cols = {col["name"] for col in inspector.get_columns("documents")}
+        if "block_tree" not in doc_cols:
+            statements.append("ALTER TABLE documents ADD COLUMN block_tree JSON")
+
+    if "extraction_jobs" in inspector.get_table_names():
+        job_cols = {col["name"] for col in inspector.get_columns("extraction_jobs")}
+        if "populated_tree" not in job_cols:
+            statements.append("ALTER TABLE extraction_jobs ADD COLUMN populated_tree JSON")
+
     if not statements:
         return
 

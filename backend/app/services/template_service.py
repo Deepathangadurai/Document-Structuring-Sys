@@ -5,9 +5,12 @@ import time
 from pathlib import Path
 from typing import Any, cast
 from uuid import uuid4
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from app.db.models import Template, Project, ExtractionJob, ExtractedField, SourceReference
+
+logger = logging.getLogger(__name__)
 from app.core.config import settings
 from app.services.schema_inference import (
     infer_schema_sections_with_page_count,
@@ -191,6 +194,19 @@ class TemplateService:
                 if getattr(template, "structure_locked") != structure_locked_val:
                     setattr(template, "structure_locked", structure_locked_val)
                     updated = True
+                if getattr(template, "block_tree", None) is None:
+                    source_path = self._find_source_document(child, file_name_val)
+                    if source_path is not None and source_path.suffix.lower() in (".docx", ".doc"):
+                        try:
+                            from app.services.block_tree_service import parse_docx as _parse_docx
+                            _bt = _parse_docx(source_path, template_id, schema=merged_schema)
+                            setattr(template, "block_tree", _bt.to_dict())
+                            flag_modified(template, "block_tree")
+                            updated = True
+                        except Exception as _bt_err:
+                            logger.warning(
+                                "BlockTree parse failed for existing template %s: %s", template_id, _bt_err
+                            )
                 if updated:
                     self.db.add(template)
                 seen_template_ids.add(template_id)
@@ -250,6 +266,20 @@ class TemplateService:
                 pending_schema["document_sections"] = document_sections
                 pending_schema["static_blocks"] = static_blocks
 
+                # Build the canonical block-tree for this template so extraction
+                # jobs can run section-to-section alignment without re-parsing
+                # the .docx on every run.
+                block_tree_dict: dict | None = None
+                if source_path is not None and source_path.suffix.lower() in (".docx", ".doc"):
+                    try:
+                        from app.services.block_tree_service import parse_docx as _parse_docx
+                        _bt = _parse_docx(source_path, template_id, schema=dict(schema))
+                        block_tree_dict = _bt.to_dict()
+                    except Exception as _bt_err:
+                        logger.warning(
+                            "BlockTree parse failed for %s: %s", template_id, _bt_err
+                        )
+
                 template = Template(
                     template_id=template_id,
                     template_name=template_name_val,
@@ -262,6 +292,7 @@ class TemplateService:
                     is_active=False,
                     status="pending",
                     structure_locked=structure_locked_val,
+                    block_tree=block_tree_dict,
                 )
                 self.db.add(template)
                 seen_template_ids.add(template_id)

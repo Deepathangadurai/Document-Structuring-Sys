@@ -46,7 +46,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import docx
 from docx.document import Document as DocxDocument
@@ -72,6 +72,7 @@ class DynamicFieldMapping:
         section_id: str = "",
         section_heading: str = "",
         label_patterns: list[str] | None = None,
+        default_value: str = "",
     ):
         self.field_id = field_id
         self.field_label = field_label
@@ -81,6 +82,7 @@ class DynamicFieldMapping:
         self.section_heading = section_heading
         # All label variants to search for (canonical + abbreviations)
         self.label_patterns: list[str] = label_patterns or [field_label]
+        self.default_value = default_value
         self.replacements_made = 0
 
     def to_dict(self) -> dict[str, Any]:
@@ -326,6 +328,8 @@ class TemplatePopulationEngine:
         extracted_values: dict[str, str],
         output_path: Path,
         preserve_structure: bool = True,
+        static_overrides: Optional[dict[str, str]] = None,
+        table_blocks: Optional[list[dict]] = None,
     ) -> tuple[bool, dict[str, Any]]:
         """
         Populate the template with *extracted_values* and write to *output_path*.
@@ -389,17 +393,59 @@ class TemplatePopulationEngine:
                 section_id=field_info.get("_section_id", ""),
                 section_heading=field_info.get("_section_name", ""),
                 label_patterns=field_info.get("label_patterns") or [field_info.get("field_label", field_id)],
+                default_value=str(field_info.get("default_value") or ""),
             )
             self.field_mappings[field_id] = mapping
 
         # --- Step 2: Perform section-scoped label-anchored replacements ----
         replacement_count = self._replace_all(doc, all_paras, section_map, report)
 
+        # --- Step 2b: Cover-header same-cell patch -------------------------
+        # The CHEMTEX cover page header table uses a "LABEL : value" format
+        # inside a single cell (e.g. "SPEC. NO   :   IP009-43-03-01").
+        # Standard label-anchored replacement can't split those, so we
+        # do a targeted regex swap on all tables in the document.
+        replacement_count += self._patch_cover_header_cells(doc, report)
+
+        # --- Step 2c: Section Running Headers Patch (Every Page Header) ----
+        # In Word DOCX templates, running page headers carry text like
+        # "CHEMTEX  SPEC. NO. IP009-43-00-01 REV. 0   SHEET 20 OF 20".
+        # We replace the SPEC. NO, REV, and SHEET in all section headers.
+        replacement_count += self._patch_section_headers(doc, report)
+
         # --- Step 3: Table-cell pair scan for unmatched fields -------------
         # Cover-page and summary tables store label and value in adjacent
         # cells (not as "Label: Value" in one paragraph).  Scan all tables
         # for any field not yet replaced.
         replacement_count += self._replace_in_table_cell_pairs(doc, report)
+
+        # --- Step 4: Default-value fallback scan for remaining fields -----
+        # For cover page / title blocks without 'Label: ' prefixes, match
+        # by the schema's default_value and replace with user's value.
+        replacement_count += self._replace_by_default_values(doc, all_paras, report)
+
+        # --- Step 5: Replace modified static text blocks (user overrides) ----
+        if static_overrides:
+            for orig_text, new_text in static_overrides.items():
+                if not orig_text or not new_text or orig_text == new_text:
+                    continue
+                for para in all_paras:
+                    curr_p_text = _para_text(para).strip()
+                    if curr_p_text and (curr_p_text == orig_text or orig_text in curr_p_text):
+                        updated = curr_p_text.replace(orig_text, new_text)
+                        _set_run_text(para, updated)
+                        replacement_count += 1
+                        report["field_operations"].append({
+                            "field_id": "static_text_override",
+                            "location": "static_paragraph",
+                            "old_value": curr_p_text,
+                            "new_value": updated,
+                        })
+
+        # --- Step 6: Synchronize multi-column data tables (add/delete/edit rows) ---
+        if table_blocks:
+            table_replacements = self._populate_data_tables(doc, table_blocks, report)
+            replacement_count += table_replacements
 
         report["replacements_made"] = replacement_count
 
@@ -584,6 +630,184 @@ class TemplatePopulationEngine:
             if count:
                 break
         return count
+    def _patch_cover_header_cells(
+        self,
+        doc: DocxDocument,
+        report: dict[str, Any],
+    ) -> int:
+        """
+        Patch cover-page header table cells where the label and value live in
+        the SAME cell, separated by a colon: e.g. "SPEC. NO   :   IP009-43-03-01".
+
+        The standard label-anchored scan replaces "Label: <value>" only when
+        they are on a single body paragraph line.  Table cells with combined
+        "LABEL : value" text are not reached that way, so we handle them here.
+
+        We look for cells whose text matches one of the known cover-header
+        patterns (case-insensitive) and swap out the value portion (after the
+        last colon / dash separator) with the user-edited value.
+
+        Patterns handled (in the CHEMTEX cover table):
+            SPEC. NO   :   <spec_no>
+            REV. <rev>            (no colon — whole cell)
+            PROJECT NO :   <project_no>
+            SH. <sheet>           (no colon — whole cell)
+            AREA:   <area>
+            DESCRIPTION :   <description>
+        """
+        # Map of (label_pattern_regex, field_id) pairs.
+        # field_id must match a key in self.field_mappings.
+        COVER_CELL_PATTERNS: list[tuple[str, str]] = [
+            # label contains a colon separator: replace value after the colon
+            (r"(?i)SPEC[.\s]*NO[.\s]*\s*:", "spec_no"),
+            (r"(?i)PROJECT\s+NO[.\s]*\s*:", "project_no"),
+            (r"(?i)AREA\s*:", "area"),
+            (r"(?i)DESCRIPTION\s*:", "description"),
+            # label without colon: REV. <value>  or  SH. <value>
+            (r"(?i)^REV[.\s]+", "revision"),
+            (r"(?i)^SH[.\s]+", "sheet_no"),
+        ]
+
+        count = 0
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    # Collect the full cell text across all paragraphs
+                    cell_text = "\n".join(
+                        "".join(r.text for r in p.runs)
+                        for p in cell.paragraphs
+                    ).strip()
+                    if not cell_text:
+                        continue
+
+                    for pattern, fid in COVER_CELL_PATTERNS:
+                        if fid not in self.field_mappings:
+                            continue
+                        mapping = self.field_mappings[fid]
+                        new_val = mapping.value
+                        if not new_val:
+                            continue
+
+                        m = re.search(pattern, cell_text)
+                        if not m:
+                            continue
+
+                        # Build replacement text
+                        if ":" in pattern:
+                            # Keep everything up to and including the colon,
+                            # then append the new value with spacing.
+                            label_prefix = cell_text[: m.end()].rstrip()
+                            new_cell_text = f"{label_prefix}   {new_val}"
+                        else:
+                            # Pattern like "REV. " — replace everything after
+                            # the matched prefix.
+                            label_prefix = cell_text[: m.end()]
+                            new_cell_text = f"{label_prefix}{new_val}"
+
+                        # Write back into the first paragraph of the cell,
+                        # normalising runs first.
+                        if cell.paragraphs:
+                            para = cell.paragraphs[0]
+                            try:
+                                _merge_runs(para)
+                            except Exception:
+                                pass
+                            old_text = _para_text(para)
+                            _set_run_text(para, new_cell_text)
+                            mapping.replacements_made += 1
+                            count += 1
+                            report["field_operations"].append({
+                                "field_id":   fid,
+                                "section_id": "cover_header_table",
+                                "label_used": pattern,
+                                "old_value":  old_text,
+                                "new_value":  new_cell_text,
+                                "location":   "cover_header_cell",
+                            })
+                            break  # one match per cell is enough
+
+        return count
+
+    def _patch_section_headers(
+        self,
+        doc: DocxDocument,
+        report: dict[str, Any],
+    ) -> int:
+        """
+        Patch running header paragraphs across all sections of the Word document.
+        In DOCX templates, running headers contain text such as:
+          'CHEMTEX\tSPEC. NO. IP009-43-00-01 REV. 0\t\tSHEET 20 OF 20'
+        We update SPEC. NO, REV, and SHEET according to user edits.
+        """
+        count = 0
+        spec_mapping = self.field_mappings.get("spec_no")
+        rev_mapping = self.field_mappings.get("revision")
+        sheet_mapping = self.field_mappings.get("sheet_no")
+
+        spec_val = spec_mapping.value if spec_mapping and spec_mapping.value else None
+        rev_val = rev_mapping.value if rev_mapping and rev_mapping.value else None
+        sheet_val = sheet_mapping.value if sheet_mapping and sheet_mapping.value else None
+
+        if not spec_val and not rev_val and not sheet_val:
+            return 0
+
+        clean_rev = re.sub(r"(?i)^REV[.\s]*", "", str(rev_val)).strip() if rev_val else None
+
+        for section in doc.sections:
+            headers_to_check = [section.header]
+            if hasattr(section, "first_page_header") and section.first_page_header is not None:
+                headers_to_check.append(section.first_page_header)
+            if hasattr(section, "even_page_header") and section.even_page_header is not None:
+                headers_to_check.append(section.even_page_header)
+
+            for hdr in headers_to_check:
+                # Check header paragraphs
+                for p in hdr.paragraphs:
+                    text = p.text
+                    if not text:
+                        continue
+                    orig_text = text
+                    if spec_val:
+                        text = re.sub(r"(?i)(SPEC[.\s]*NO[.\s]*\s*)([A-Z0-9\-_/]+)", rf"\g<1>{spec_val}", text)
+                    if clean_rev:
+                        text = re.sub(r"(?i)(REV[.\s]*\s*)([A-Z0-9]+)", rf"\g<1>{clean_rev}", text)
+                    if sheet_val:
+                        text = re.sub(r"(?i)(SHEET\s+)(\d+\s+OF\s+\d+)", rf"\g<1>{sheet_val}", text)
+                    if text != orig_text:
+                        p.text = text
+                        count += 1
+                        report["field_operations"].append({
+                            "field_id": "section_running_header",
+                            "location": "section_header",
+                            "old_value": orig_text,
+                            "new_value": text,
+                        })
+
+                # Check header tables if any
+                for table in hdr.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            for p in cell.paragraphs:
+                                text = p.text
+                                if not text:
+                                    continue
+                                orig_text = text
+                                if spec_val:
+                                    text = re.sub(r"(?i)(SPEC[.\s]*NO[.\s]*\s*)([A-Z0-9\-_/]+)", rf"\g<1>{spec_val}", text)
+                                if clean_rev:
+                                    text = re.sub(r"(?i)(REV[.\s]*\s*)([A-Z0-9]+)", rf"\g<1>{clean_rev}", text)
+                                if sheet_val:
+                                    text = re.sub(r"(?i)(SHEET\s+)(\d+\s+OF\s+\d+)", rf"\g<1>{sheet_val}", text)
+                                if text != orig_text:
+                                    p.text = text
+                                    count += 1
+                                    report["field_operations"].append({
+                                        "field_id": "section_running_header_table",
+                                        "location": "section_header_table",
+                                        "old_value": orig_text,
+                                        "new_value": text,
+                                    })
+        return count
 
     def _replace_in_table_cell_pairs(
         self,
@@ -653,6 +877,181 @@ class TemplatePopulationEngine:
                 break  # All remaining fields resolved
 
         return count
+
+    def _replace_by_default_values(
+        self,
+        doc: DocxDocument,
+        all_paras: list[Paragraph],
+        report: dict[str, Any],
+    ) -> int:
+        """
+        For unmatched fields whose template text doesn't have a 'Label: ' prefix
+        (e.g., cover page titles, project number, client name), match by the
+        schema's default_value and replace it with the new value.
+        """
+        count = 0
+        unmatched = {
+            fid: m for fid, m in self.field_mappings.items()
+            if m.replacements_made == 0 and m.default_value and len(m.default_value.strip()) >= 3
+        }
+        if not unmatched:
+            return 0
+
+        # 1. Scan paragraphs
+        for para in all_paras:
+            text = _para_text(para)
+            if not text.strip():
+                continue
+            for fid, mapping in list(unmatched.items()):
+                target_vals = [mapping.default_value.strip()]
+                # If project_no e.g. "IP009" and paragraph has "IP-009" or vice versa:
+                if "ip" in mapping.default_value.lower():
+                    clean_ip = re.sub(r"[^a-zA-Z0-9]", "", mapping.default_value)
+                    dashed_ip = (
+                        mapping.default_value[:2] + "-" + mapping.default_value[2:]
+                        if len(mapping.default_value) > 2 and "-" not in mapping.default_value
+                        else mapping.default_value
+                    )
+                    target_vals.extend([clean_ip, dashed_ip])
+
+                for target in set(target_vals):
+                    if len(target) < 3:
+                        continue
+                    # Case-insensitive word boundary or full string match
+                    pattern = re.compile(rf"\b{re.escape(target)}\b", re.IGNORECASE)
+                    if pattern.search(text):
+                        new_text = pattern.sub(mapping.value, text, count=1)
+                        _set_run_text(para, new_text)
+                        mapping.replacements_made += 1
+                        count += 1
+                        report["field_operations"].append({
+                            "field_id": mapping.field_id,
+                            "section_id": mapping.section_id,
+                            "label_used": f"default_value:{target}",
+                            "old_value": text.strip(),
+                            "new_value": mapping.value,
+                            "location": "default_value_para",
+                        })
+                        del unmatched[fid]
+                        text = new_text
+                        break
+
+        # 2. Scan table cells if any remain
+        if unmatched:
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            p_text = _para_text(p).strip()
+                            if not p_text:
+                                continue
+                            for fid, mapping in list(unmatched.items()):
+                                target = mapping.default_value.strip()
+                                pattern = re.compile(rf"\b{re.escape(target)}\b", re.IGNORECASE)
+                                if pattern.search(p_text):
+                                    new_text = pattern.sub(mapping.value, p_text, count=1)
+                                    _set_run_text(p, new_text)
+                                    mapping.replacements_made += 1
+                                    count += 1
+                                    report["field_operations"].append({
+                                        "field_id": mapping.field_id,
+                                        "section_id": mapping.section_id,
+                                        "label_used": f"default_value:{target}",
+                                        "old_value": p_text,
+                                        "new_value": mapping.value,
+                                        "location": "default_value_table",
+                                    })
+                                    del unmatched[fid]
+                                    break
+
+        return count
+
+    def _populate_data_tables(
+        self,
+        doc: DocxDocument,
+        table_blocks: list[dict],
+        report: dict[str, Any],
+    ) -> int:
+        """
+        Synchronize Word document tables (doc.tables) with table_blocks from populated_tree.
+        Supports:
+          1. Editing existing cells in data rows
+          2. Adding new rows (preserving row formatting & XML styles)
+          3. Deleting rows (removing extra rows from table XML)
+        """
+        import copy
+        replacements = 0
+
+        for tblock in table_blocks:
+            tdata = tblock.get("table_data")
+            if not tdata or len(tdata) < 1:
+                continue
+
+            target_headers = [str(c or "").strip().lower() for c in tdata[0] if str(c or "").strip()]
+            if not target_headers:
+                continue
+
+            # Find matching table in doc.tables
+            matched_table = None
+            for tbl in doc.tables:
+                if not tbl.rows:
+                    continue
+                tbl_headers = [str(c.text or "").strip().lower() for c in tbl.rows[0].cells if str(c.text or "").strip()]
+                # Check overlap between target_headers and tbl_headers
+                overlap = sum(1 for th in target_headers if any(th in dh or dh in th for dh in tbl_headers))
+                if overlap >= max(1, len(target_headers) // 2):
+                    matched_table = tbl
+                    break
+
+            if not matched_table:
+                continue
+
+            data_rows = tdata[1:]
+
+            # 1. If user added rows, append new rows copying XML structure of last row
+            while len(matched_table.rows) - 1 < len(data_rows) and len(matched_table.rows) > 1:
+                new_tr = copy.deepcopy(matched_table.rows[-1]._tr)
+                matched_table._tbl.append(new_tr)
+
+            # 2. If user deleted rows, remove extra rows from XML
+            while len(matched_table.rows) - 1 > len(data_rows) and len(matched_table.rows) > 1:
+                last_row = matched_table.rows[-1]
+                matched_table._tbl.remove(last_row._tr)
+
+            # 3. Populate all cell values
+            for ri, row_vals in enumerate(data_rows):
+                row_idx = ri + 1  # header is row 0
+                if row_idx >= len(matched_table.rows):
+                    break
+                tbl_row = matched_table.rows[row_idx]
+                for ci, cell_val in enumerate(row_vals):
+                    if ci >= len(tbl_row.cells):
+                        break
+                    cell = tbl_row.cells[ci]
+                    val_str = str(cell_val if cell_val is not None else "")
+                    curr_cell_text = cell.text.strip()
+                    if curr_cell_text != val_str:
+                        if cell.paragraphs:
+                            p = cell.paragraphs[0]
+                            for r in list(p.runs[1:]):
+                                p._p.remove(r._r)
+                            if p.runs:
+                                p.runs[0].text = val_str
+                            else:
+                                p.add_run(val_str)
+                            for extra_p in list(cell.paragraphs[1:]):
+                                cell._tc.remove(extra_p._p)
+                        else:
+                            cell.text = val_str
+                        replacements += 1
+                        report["field_operations"].append({
+                            "field_id": f"{tblock.get('block_id', 'table')}_r{ri}_c{ci}",
+                            "location": "table_cell",
+                            "old_value": curr_cell_text,
+                            "new_value": val_str,
+                        })
+
+        return replacements
 
     # ------------------------------------------------------------------
     # Validation report

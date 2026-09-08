@@ -177,6 +177,25 @@ class DocumentService:
             self.db.add(page)
         self.db.commit()
 
+        # Build canonical block-tree for the uploaded document so the extraction
+        # job can run section-to-section alignment without re-parsing the file.
+        try:
+            if file_type in {"docx", "doc"}:
+                from app.services.block_tree_service import parse_docx as _bts_parse_docx
+                _bt = _bts_parse_docx(document_path, f"doc_{doc_id}")
+                setattr(document, "block_tree", _bt.to_dict())
+            elif file_type == "pdf":
+                from app.services.block_tree_service import parse_pdf as _bts_parse_pdf
+                _bt = _bts_parse_pdf(document_path, f"doc_{doc_id}")
+                setattr(document, "block_tree", _bt.to_dict())
+            self.db.add(document)
+            self.db.commit()
+        except Exception as _bt_err:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "BlockTree parse failed for document %s: %s", doc_id, _bt_err
+            )
+
     def _extract_pdf_pages(self, document: Document, path: Path):
         pages = []
         doc_id = cast(int, document.id)

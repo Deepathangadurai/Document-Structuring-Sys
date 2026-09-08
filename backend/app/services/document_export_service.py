@@ -275,25 +275,57 @@ class DocumentExportService:
             doc_fitz = fitz.open()
             d = docx.Document(str(docx_file))
             page = doc_fitz.new_page(width=595, height=842)  # A4
-            margin_left = 50
-            
-            # Header
-            page.draw_rect(fitz.Rect(40, 30, 555, 75), color=(0.1, 0.23, 0.42), fill=(0.95, 0.97, 1.0))
-            page.insert_text(fitz.Point(50, 55), "AmperePro Engineers - Structured Document Report", fontsize=12, color=(0.1, 0.23, 0.42))
-            y = 100
-            
+
+            # ── 1. CHEMTEX Header Box Table (Matching Reference Flow) ──
+            # Outer Box: (40, 30, 555, 110)
+            page.draw_rect(fitz.Rect(40, 30, 555, 110), color=(0.0, 0.0, 0.0), width=1.0)
+            # Vertical Dividers
+            page.draw_line(fitz.Point(240, 30), fitz.Point(240, 110), color=(0.0, 0.0, 0.0), width=0.8)
+            page.draw_line(fitz.Point(440, 30), fitz.Point(440, 83), color=(0.0, 0.0, 0.0), width=0.8)
+            # Horizontal Dividers
+            page.draw_line(fitz.Point(240, 56), fitz.Point(555, 56), color=(0.0, 0.0, 0.0), width=0.8)
+            page.draw_line(fitz.Point(40, 83), fitz.Point(555, 83), color=(0.0, 0.0, 0.0), width=0.8)
+
+            # Header Texts
+            page.insert_text(fitz.Point(100, 55), "CHEMTEX", fontsize=12, color=(0, 0, 0))
+            page.insert_text(fitz.Point(245, 47), "SPEC. NO.   :  IP009-43-00-01", fontsize=8.5, color=(0, 0, 0))
+            page.insert_text(fitz.Point(445, 47), "REV. 0", fontsize=8.5, color=(0, 0, 0))
+
+            page.insert_text(fitz.Point(245, 73), "PROJECT NO :  IP009", fontsize=8.5, color=(0, 0, 0))
+            page.insert_text(fitz.Point(445, 73), "SHT. 1 OF 20", fontsize=8.5, color=(0, 0, 0))
+
+            page.insert_text(fitz.Point(45, 100), "AREA:  ELECTRICAL", fontsize=8.5, color=(0, 0, 0))
+            page.insert_text(fitz.Point(245, 100), "DESCRIPTION :  ELECTRICAL DESIGN BASIS", fontsize=8.5, color=(0, 0, 0))
+
+            y = 150
             for p in d.paragraphs:
                 if not p.text.strip():
-                    y += 8
+                    y += 10
                     continue
                 if y > 780:
                     page = doc_fitz.new_page(width=595, height=842)
                     y = 50
                 is_bold = any(r.bold for r in p.runs)
-                font_size = 12 if is_bold else 9.5
-                color = (0.1, 0.23, 0.42) if is_bold else (0.1, 0.1, 0.1)
-                page.insert_text(fitz.Point(margin_left, y), p.text[:90], fontsize=font_size, color=color)
-                y += 16
+                font_size = 14 if (is_bold and len(p.text) < 40) else (10 if is_bold else 9)
+                # Center cover page title elements
+                x = (595 - len(p.text) * (font_size * 0.5)) / 2 if font_size >= 14 else 50
+                x = max(50, x)
+                page.insert_text(fitz.Point(x, y), p.text[:95], fontsize=font_size, color=(0, 0, 0))
+                y += 22 if font_size >= 14 else 14
+
+            # Render tables if present
+            for table in d.tables:
+                if y > 720:
+                    page = doc_fitz.new_page(width=595, height=842)
+                    y = 50
+                for row in table.rows:
+                    row_txt = "  |  ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                    if row_txt:
+                        if y > 780:
+                            page = doc_fitz.new_page(width=595, height=842)
+                            y = 50
+                        page.insert_text(fitz.Point(50, y), row_txt[:100], fontsize=8.5, color=(0.1, 0.1, 0.1))
+                        y += 14
 
             doc_fitz.save(str(pdf_file))
             doc_fitz.close()

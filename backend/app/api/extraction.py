@@ -1,7 +1,8 @@
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
@@ -19,7 +20,7 @@ from app.db.schemas import (
 
 router = APIRouter()
 
-ALLOWED_VALIDATION_STATUSES = {"pending", "verified", "missing", "review", "rejected"}
+ALLOWED_VALIDATION_STATUSES = {"pending", "verified", "missing", "review", "rejected", "default"}
 
 
 def _run_extraction_in_thread(job_id: int) -> None:
@@ -213,15 +214,65 @@ def preview_extraction_pdf(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"PDF preview generation failed: {exc}")
 
 
+def _get_or_render_preview_pages(job, extraction_service) -> tuple[Path, int]:
+    """
+    Renders all pages of the populated document to PNG images in a cached directory.
+    Invalidates automatically when job status or field values change.
+    Returns (cache_dir, total_pages).
+    """
+    import hashlib
+    import json
+    import fitz
+    from app.services.document_export_service import DocumentExportService
+
+    # Signature based on job id, status, extracted fields, and populated_tree to automatically invalidate cache on any edit
+    fields_sig = "".join(f"{f.field_id}:{f.value}" for f in sorted(job.extracted_fields or [], key=lambda x: x.field_id))
+    tree_sig = str(len(json.dumps(job.populated_tree))) if job.populated_tree else ""
+    hash_key = hashlib.md5(f"{job.id}_{job.status}_{fields_sig}_{tree_sig}".encode()).hexdigest()[:12]
+
+    cache_dir = Path(tempfile.gettempdir()) / f"dss_preview_{job.id}_{hash_key}"
+    info_file = cache_dir / "info.json"
+
+    if cache_dir.exists() and info_file.exists():
+        try:
+            with open(info_file, "r") as f:
+                info = json.load(f)
+                return cache_dir, info.get("total_pages", 1)
+        except Exception:
+            pass
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    docx_output_path = cache_dir / f"extraction_{job.id}.docx"
+    extraction_service.export_as_docx(job, str(docx_output_path))
+    pdf_path = DocumentExportService.convert_docx_to_pdf(str(docx_output_path))
+
+    pdf_doc = fitz.open(pdf_path)
+    total_pages = len(pdf_doc)
+
+    mat = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI for crisp preview
+    for p_idx in range(total_pages):
+        page = pdf_doc[p_idx]
+        pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB, alpha=False)
+        img_path = cache_dir / f"page_{p_idx + 1}.png"
+        pix.save(str(img_path))
+
+    pdf_doc.close()
+
+    try:
+        with open(info_file, "w") as f:
+            json.dump({"total_pages": total_pages}, f)
+    except Exception:
+        pass
+
+    return cache_dir, total_pages
+
+
 @router.get("/extraction/{job_id}/preview/page/{page_number}")
 def preview_extraction_page_image(job_id: int, page_number: int, db: Session = Depends(get_db)):
     """
     Render a specific page of the final populated PDF output as a high-resolution PNG image.
     This guarantees a 100% exact match with the downloaded PDF/DOCX file.
     """
-    import fitz  # PyMuPDF
-    from app.services.document_export_service import DocumentExportService
-
     extraction_service = ExtractionService(db)
     job = extraction_service.get_job(job_id)
     if not job:
@@ -229,29 +280,22 @@ def preview_extraction_page_image(job_id: int, page_number: int, db: Session = D
     if job.status != "completed":
         raise HTTPException(status_code=400, detail="Extraction job has not completed yet")
 
-    tmp_dir = tempfile.mkdtemp()
-    docx_output_path = Path(tmp_dir) / f"extraction_{job_id}.docx"
-    extraction_service.export_as_docx(job, str(docx_output_path))
     try:
-        pdf_path = DocumentExportService.convert_docx_to_pdf(str(docx_output_path))
-        pdf_doc = fitz.open(pdf_path)
-        total_pages = len(pdf_doc)
+        cache_dir, total_pages = _get_or_render_preview_pages(job, extraction_service)
         if page_number < 1 or page_number > total_pages:
-            pdf_doc.close()
             raise HTTPException(status_code=404, detail=f"Page {page_number} out of range (total pages: {total_pages})")
 
-        page = pdf_doc[page_number - 1]
-        mat = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI
-        pix = page.get_pixmap(matrix=mat, colorspace=fitz.csRGB, alpha=False)
-        img_output_path = Path(tmp_dir) / f"page_{page_number}.png"
-        pix.save(str(img_output_path))
-        pdf_doc.close()
+        img_output_path = cache_dir / f"page_{page_number}.png"
+        if not img_output_path.exists():
+            raise HTTPException(status_code=404, detail=f"Page image {page_number} not found")
 
         return FileResponse(
             str(img_output_path),
             media_type="image/png",
             headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
                 "X-Total-Pages": str(total_pages),
             },
         )
@@ -264,9 +308,6 @@ def preview_extraction_page_image(job_id: int, page_number: int, db: Session = D
 @router.get("/extraction/{job_id}/preview/info")
 def preview_extraction_info(job_id: int, db: Session = Depends(get_db)):
     """Get metadata (total pages) for the true rendered PDF output document."""
-    import fitz
-    from app.services.document_export_service import DocumentExportService
-
     extraction_service = ExtractionService(db)
     job = extraction_service.get_job(job_id)
     if not job:
@@ -275,16 +316,10 @@ def preview_extraction_info(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Extraction job has not completed yet")
 
     try:
-        tmp_dir = tempfile.mkdtemp()
-        docx_output_path = Path(tmp_dir) / f"extraction_{job_id}.docx"
-        extraction_service.export_as_docx(job, str(docx_output_path))
-        pdf_path = DocumentExportService.convert_docx_to_pdf(str(docx_output_path))
-        pdf_doc = fitz.open(pdf_path)
-        total_pages = len(pdf_doc)
-        pdf_doc.close()
+        _, total_pages = _get_or_render_preview_pages(job, extraction_service)
         return {"job_id": job_id, "total_pages": total_pages}
     except Exception as exc:
-        return {"job_id": job_id, "total_pages": job.total_pages, "error": str(exc)}
+        return {"job_id": job_id, "total_pages": job.total_pages or 1, "error": str(exc)}
 
 @router.patch("/extraction/{job_id}/fields/{field_id}", response_model=ExtractedFieldResponse)
 def update_extracted_field(job_id: int, field_id: str, payload: FieldUpdateRequest, db: Session = Depends(get_db)):
@@ -310,6 +345,8 @@ def update_extracted_field(job_id: int, field_id: str, payload: FieldUpdateReque
         "confidence": field.confidence,
         "validation_status": field.validation_status,
         "verification_status": field.verification_status,
+        "default_value": getattr(field, "default_value", None),
+        "is_default": field.validation_status == "default",
         "is_dynamic": field.is_dynamic,
         "source_references": [
             {
@@ -320,6 +357,36 @@ def update_extracted_field(job_id: int, field_id: str, payload: FieldUpdateReque
             }
             for source in field.source_references
         ],
+    }
+
+
+class BlockUpdateRequest(BaseModel):
+    text: Optional[str] = None
+    table_data: Optional[list[list[str]]] = None
+
+
+@router.patch("/extraction/{job_id}/blocks/{block_id}")
+def update_extracted_block(
+    job_id: int,
+    block_id: str,
+    payload: BlockUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    """Update static document block/paragraph/table in populated_tree."""
+    extraction_service = ExtractionService(db)
+    updated = extraction_service.update_block(
+        job_id,
+        block_id,
+        new_text=payload.text,
+        new_table_data=payload.table_data,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Block not found for this extraction job")
+    return {
+        "success": True,
+        "block_id": block_id,
+        "text": payload.text,
+        "table_data": payload.table_data,
     }
 
 

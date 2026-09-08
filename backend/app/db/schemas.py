@@ -164,6 +164,8 @@ class ExtractedFieldResponse(BaseModel):
     confidence: Optional[float] = None
     validation_status: str
     verification_status: Optional[str] = None
+    default_value: Optional[str] = None
+    is_default: Optional[bool] = None
     source_references: List[SourceReferenceResponse] = Field(default_factory=list)
 
     class Config:
@@ -185,6 +187,7 @@ class ExtractionJobResponse(BaseModel):
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     extracted_fields: List[ExtractedFieldResponse] = Field(default_factory=list)
+    populated_tree: Optional[dict[str, Any]] = None
 
     class Config:
         from_attributes = True

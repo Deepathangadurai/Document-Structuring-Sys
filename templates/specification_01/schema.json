@@ -26,7 +26,12 @@
           "label_patterns": [
             "Spec. No.",
             "Spec. No",
-            "Spec No"
+            "Spec No",
+            "SPEC. NO.",
+            "SPEC. NO",
+            "SPEC NO",
+            "Specification No",
+            "Specification Number"
           ]
         },
         {
@@ -91,7 +96,13 @@
           "default_value": "0",
           "validation_rules": [],
           "label_patterns": [
-            "Revision"
+            "Revision",
+            "Rev.",
+            "REV.",
+            "Rev. No.",
+            "REV. NO.",
+            "Rev No",
+            "Rev"
           ]
         },
         {
@@ -105,7 +116,10 @@
           "validation_rules": [],
           "label_patterns": [
             "Project No.",
-            "Project No"
+            "Project No",
+            "PROJECT NO.",
+            "PROJECT NO",
+            "Project Number"
           ]
         }
       ]
