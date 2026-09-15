@@ -76,5 +76,87 @@
         }
       ]
     }
+  ],
+  "content_page": [
+    {
+      "number": "1.0",
+      "title": "IDENTIFICATION"
+    },
+    {
+      "number": "2.0",
+      "title": "SCOPE"
+    },
+    {
+      "number": "3.0",
+      "title": "CODES AND STANDARDS"
+    },
+    {
+      "number": "4.0",
+      "title": "SYSTEM PARTICULARS"
+    },
+    {
+      "number": "5.0",
+      "title": "SITE ENVIRONMENTAL CONDITIONS"
+    },
+    {
+      "number": "6.0",
+      "title": "CONSTRUCTION"
+    },
+    {
+      "number": "7.0",
+      "title": "ELECTRICAL EQUIPMENT"
+    },
+    {
+      "number": "8.0",
+      "title": "MAKE OF COMPONENTS"
+    },
+    {
+      "number": "9.0",
+      "title": "EQUIPMENT NAME PLATE"
+    },
+    {
+      "number": "10.0",
+      "title": "PAINTING"
+    },
+    {
+      "number": "11.0",
+      "title": "INSPECTION & TESTING"
+    },
+    {
+      "number": "12.0",
+      "title": "PACKING"
+    },
+    {
+      "number": "13.0",
+      "title": "SPECIAL TOOLS"
+    },
+    {
+      "number": "14.0",
+      "title": "SPARES"
+    },
+    {
+      "number": "15.0",
+      "title": "DEVIATIONS"
+    },
+    {
+      "number": "16.0",
+      "title": "QUALITY ASSURANCE"
+    },
+    {
+      "number": "17.0",
+      "title": "GUARANTEE"
+    },
+    {
+      "number": "18.0",
+      "title": "LIST OF DOCUMENTS ATTACHED"
+    },
+    {
+      "number": "19.0",
+      "title": "TECHNICAL PARTICULARS"
+    },
+    {
+      "number": "20.0",
+      "title": "VENDOR DRAWINGS & DOCUMENT SCHEDULE"
+    }
   ]
 }

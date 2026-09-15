@@ -323,9 +323,7 @@ export default function CreateProject() {
                       <p className="text-sm text-slate-500 mt-0.5">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
                     </div>
                   </div>
-                  {uploading ? (
-                    <span className="text-sm font-semibold text-brand">{uploadProgress}%</span>
-                  ) : (
+                  {!uploading && (
                     <div className="flex items-center text-success text-sm font-medium">
                       <Icons.Check /> <span className="ml-1">Ready</span>
                     </div>
@@ -353,7 +351,7 @@ export default function CreateProject() {
                     Remove
                   </Button>
                   <Button onClick={handleUploadAndDetect} disabled={uploading}>
-                    {uploading ? `Uploading… ${uploadProgress}%` : 'Upload & Detect Specifications'}
+                    {uploading ? 'Uploading…' : 'Upload & Detect Specifications'}
                   </Button>
                 </div>
               </Card>

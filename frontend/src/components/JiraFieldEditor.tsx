@@ -18,7 +18,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { structuralCheck, type StructuralValidationResult } from '../services/api'
-import { Pencil, Check, X, RotateCcw, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Check, X, RotateCcw, Plus, Trash2, Filter, ChevronDown, ChevronUp, FileText, ClipboardList, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || '/api'
 
@@ -122,6 +122,7 @@ interface SchemaTemplate {
   template_name: string
   specification_number?: string | null
   version: string
+  content_page?: { number: string; title: string }[]
   sections: SchemaSection[]
 }
 
@@ -153,6 +154,7 @@ async function fetchTemplate(
           template_name: d.template_name || templateName || templateCode,
           specification_number: d.specification_number,
           version: d.version || '1.0',
+          content_page: d.content_page || raw.content_page || [],
           sections: raw.sections || [],
         }
       }
@@ -173,6 +175,7 @@ async function fetchTemplate(
           template_name: found.template_name || templateName || '',
           specification_number: found.specification_number,
           version: found.version || '1.0',
+          content_page: found.content_page || raw.content_page || [],
           sections: raw.sections || [],
         }
       }
@@ -237,6 +240,388 @@ function parseSectionName(raw: string): { num: string; title: string } {
     return { num, title: m[2].trim().toUpperCase() }
   }
   return { num: '', title: clean.toUpperCase() }
+}
+
+export interface ResolvedClause {
+  groupKey: string
+  groupNum: string
+  groupTitle: string
+  clauseNum: string
+  clauseTitle: string
+}
+
+export const CANONICAL_SPEC01_TOC: Record<string, { num: string; title: string }> = {
+  '1': { num: '1.0', title: 'SCOPE' },
+  '2': { num: '2.0', title: 'GENERAL & DESIGN CONDITIONS' },
+  '3': { num: '3.0', title: 'POWER DISTRIBUTION PHILOSOPHY' },
+  '4': { num: '4.0', title: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS' },
+  '5': { num: '5.0', title: 'LIGHTING SYSTEM' },
+  '6': { num: '6.0', title: 'HEAT TRACING SYSTEM' },
+  '7': { num: '7.0', title: 'FIRE ALARM SYSTEM' },
+  '8': { num: '8.0', title: 'PLANT COMMUNICATION SYSTEM' },
+  '9': { num: '9.0', title: 'STATUTORY APPROVAL' },
+}
+
+export const CANONICAL_BRANCH_TITLES: Record<string, string> = {
+  // Section 1.0
+  '1.0': 'SCOPE',
+  // Section 2.0
+  '2.0': 'GENERAL',
+  '2.1': 'STANDARDS AND CODES',
+  '2.2': 'SITE CONDITIONS',
+  '2.3': 'POWER SUPPLY CONDITIONS',
+  '2.4': 'UTILIZATION VOLTAGES',
+  '2.5': 'LOAD CLASSIFICATION',
+  '2.6': 'HAZARDOUS AREA CLASSIFICATION',
+  // Section 3.0
+  '3.0': 'DESIGN PHILOSOPHY',
+  '3.1': 'POWER DISTRIBUTION PHILOSOPHY',
+  '3.2': 'CABLES',
+  '3.3': 'ELECTRICAL ROOMS / TRANSFORMER AREA',
+  '3.4': 'GROUNDING AND LIGHTNING PROTECTION',
+  '3.5': 'START / STOP PHILOSOPHY',
+  '3.6': 'CONVENIENCE RECEPTACLES',
+  // Section 4.0
+  '4.1': '11 KV OUTDOOR LOAD BREAK SWITCH',
+  '4.2': 'EMERGENCY (STAND BY) DG SET',
+  '4.3': 'DISTRIBUTION TRANSFORMER',
+  '4.4': 'LV BUSDUCT',
+  '4.5': 'POWER & MOTOR CONTROL CENTER (PMCC / MCC)',
+  '4.6': 'MAIN LIGHTING / POWER DISTRIBUTION BOARD',
+  '4.7': 'INVERTERS',
+  '4.8': 'UN-INTERRUPTED POWER SUPPLY (UPS) SYSTEM',
+  '4.9': 'BATTERY & BATTERY CHARGER',
+  '4.10': 'MV / LV MOTORS',
+  '4.11': 'LOCAL CONTROL STATION',
+  '4.12': 'FLAME PROOF / EXPLOSION PROOF EQUIPMENT',
+  '4.13': 'PACKAGE UNITS EQUIPMENT',
+  // Section 5.0
+  '5.0': 'LIGHTING SYSTEM',
+  '5.1': 'LIGHTING DESIGN PHILOSOPHY',
+  '5.2': 'WIRING TYPE',
+  '5.3': 'SUB LIGHTING DISTRIBUTION BOARD',
+  // Section 6.0
+  '6.0': 'HEAT TRACING SYSTEM',
+  // Section 7.0
+  '7.0': 'FIRE ALARM SYSTEM',
+  '7.1': 'FIRE ALARM PANEL',
+  // Section 8.0
+  '8.0': 'PLANT COMMUNICATION SYSTEM',
+  '8.1': 'PUBLIC ADDRESS SYSTEM',
+  '8.2': 'TELEPHONE SYSTEM',
+  // Section 9.0
+  '9.0': 'STATUTORY APPROVAL',
+}
+
+export function getBranchKey(clauseNum: string): string {
+  const parts = clauseNum.split('.')
+  if (parts.length >= 2) {
+    return `${parts[0]}.${parts[1]}`
+  }
+  return clauseNum
+}
+
+export function resolveClause(
+  secNum?: string | null,
+  heading?: string | null,
+  contentPage?: { number: string; title: string }[]
+): ResolvedClause {
+  const text = (heading || '').toUpperCase().trim()
+  const rawNum = (secNum || '').trim()
+  // Clean clause number from any trailing whitespace/tabs and text (e.g. "4.1.1\t11" -> num="4.1.1", remainder="11")
+  const cleanNumMatch = rawNum.match(/^(\d+(?:\.\d+)*)/)
+  const num = cleanNumMatch ? cleanNumMatch[0] : rawNum
+  const numRemainder = cleanNumMatch && cleanNumMatch[0].length < rawNum.length ? rawNum.slice(cleanNumMatch[0].length).trim() : ''
+  const fullHeading = numRemainder ? `${numRemainder} ${(heading || '').trim()}`.trim() : (heading || '').trim()
+  const cleanTitle = (fullHeading || '').replace(/^[0-9\.\-\s\t]+/, '').trim().toUpperCase() || text
+
+  // 1.0 SCOPE
+  if (num === '1.0' || num === '1' || (text.includes('SCOPE') && (num.startsWith('1.') || !num))) {
+    return { groupKey: '1', groupNum: '1.0', groupTitle: 'SCOPE', clauseNum: '1.0', clauseTitle: 'SCOPE' }
+  }
+
+  // 9.0 STATUTORY APPROVAL
+  if (num.startsWith('9.') || num === '9.0' || num === '9' || text.includes('STATUTORY') || text.includes('STATUATORY')) {
+    return { groupKey: '9', groupNum: '9.0', groupTitle: 'STATUTORY APPROVAL', clauseNum: '9.0', clauseTitle: 'STATUTORY APPROVAL' }
+  }
+
+  // 8.0 PLANT COMMUNICATION SYSTEM
+  if (num === '8.1' || text.includes('PUBLIC ADDRESS')) {
+    return { groupKey: '8', groupNum: '8.0', groupTitle: 'PLANT COMMUNICATION SYSTEM', clauseNum: '8.1', clauseTitle: 'PUBLIC ADDRESS SYSTEM' }
+  }
+  if (num === '8.2' || text.includes('TELEPHONE') || text.includes('IP PHONE')) {
+    return { groupKey: '8', groupNum: '8.0', groupTitle: 'PLANT COMMUNICATION SYSTEM', clauseNum: '8.2', clauseTitle: 'TELEPHONE SYSTEM' }
+  }
+  if (num.startsWith('8.') || text.includes('COMMUNICATION')) {
+    return { groupKey: '8', groupNum: '8.0', groupTitle: 'PLANT COMMUNICATION SYSTEM', clauseNum: '8.0', clauseTitle: 'PLANT COMMUNICATION SYSTEM' }
+  }
+
+  // 7.0 FIRE ALARM SYSTEM
+  if (num === '7.1' || text.includes('FIRE ALARM PANEL')) {
+    return { groupKey: '7', groupNum: '7.0', groupTitle: 'FIRE ALARM SYSTEM', clauseNum: '7.1', clauseTitle: 'FIRE ALARM PANEL' }
+  }
+  if (num.startsWith('7.')) {
+    return { groupKey: '7', groupNum: '7.0', groupTitle: 'FIRE ALARM SYSTEM', clauseNum: num, clauseTitle: cleanTitle || 'FIRE ALARM SYSTEM' }
+  }
+  if (text.includes('FIRE ALARM')) {
+    return { groupKey: '7', groupNum: '7.0', groupTitle: 'FIRE ALARM SYSTEM', clauseNum: '7.0', clauseTitle: cleanTitle || 'FIRE ALARM SYSTEM' }
+  }
+
+  // 6.0 HEAT TRACING SYSTEM
+  if (num.startsWith('6.') || text.includes('HEAT TRACING')) {
+    return { groupKey: '6', groupNum: '6.0', groupTitle: 'HEAT TRACING SYSTEM', clauseNum: '6.0', clauseTitle: 'HEAT TRACING SYSTEM' }
+  }
+
+  // 5.0 LIGHTING SYSTEM (Clause numbers prioritized)
+  if (num.startsWith('5.3.') || num === '5.3') {
+    return { groupKey: '5', groupNum: '5.0', groupTitle: 'LIGHTING SYSTEM', clauseNum: num, clauseTitle: cleanTitle || 'SUB LIGHTING DISTRIBUTION BOARD' }
+  }
+  if (num === '5.2' || text.includes('WIRING TYPE')) {
+    return { groupKey: '5', groupNum: '5.0', groupTitle: 'LIGHTING SYSTEM', clauseNum: '5.2', clauseTitle: 'WIRING TYPE' }
+  }
+  if (num === '5.1.i' || text.includes('ILLUMINATION LEVEL')) {
+    return { groupKey: '5', groupNum: '5.0', groupTitle: 'LIGHTING SYSTEM', clauseNum: '5.1.i', clauseTitle: 'ILLUMINATION LEVELS & TYPE OF LAMPS' }
+  }
+  if (num === '5.1.1' || text.includes('CONTROL PHILOSOPHY')) {
+    return { groupKey: '5', groupNum: '5.0', groupTitle: 'LIGHTING SYSTEM', clauseNum: '5.1.1', clauseTitle: 'LIGHTING CONTROL PHILOSOPHY' }
+  }
+  if (num === '5.1' || text.includes('LIGHTING DESIGN PHILOSOPHY')) {
+    return { groupKey: '5', groupNum: '5.0', groupTitle: 'LIGHTING SYSTEM', clauseNum: '5.1', clauseTitle: 'LIGHTING DESIGN PHILOSOPHY' }
+  }
+  if (text.includes('SUB LIGHTING')) {
+    return { groupKey: '5', groupNum: '5.0', groupTitle: 'LIGHTING SYSTEM', clauseNum: '5.3', clauseTitle: cleanTitle || 'SUB LIGHTING DISTRIBUTION BOARD' }
+  }
+  if (num.startsWith('5.') || (text.includes('LIGHTING') && !['MLDB', 'POWER DISTRIBUTION', 'RECEPTACLE', 'SWITCHBOARD'].some(k => text.includes(k)))) {
+    return { groupKey: '5', groupNum: '5.0', groupTitle: 'LIGHTING SYSTEM', clauseNum: '5.0', clauseTitle: 'LIGHTING SYSTEM' }
+  }
+
+  // 2.4.5 AUXILIARY SUPPLY (Check before 4.1 switchyard!)
+  if (num === '2.4.5' || text.includes('AUXILIARY SUPPLY')) {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.4.5', clauseTitle: 'AUXILIARY SUPPLY FOR SWITCHYARD EQUIPMENTS / MV INDOOR SWITCHBOARD' }
+  }
+
+  // 4.0 ELECTRICAL EQUIPMENT (Clause numbers prioritized to prevent loose substring collisions!)
+  if (num.startsWith('4.5.') || num === '4.5') {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: num, clauseTitle: cleanTitle || 'PMCC / MCC' }
+  }
+  if (num.startsWith('4.6.') || num === '4.6') {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: num, clauseTitle: cleanTitle || 'MAIN LIGHTING / POWER DISTRIBUTION BOARD' }
+  }
+  if (num.startsWith('4.2.') || num === '4.2') {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: num, clauseTitle: cleanTitle || 'EMERGENCY DG SET' }
+  }
+  if (num.startsWith('4.1.') || num === '4.1' || text.includes('LOAD BREAK SWITCH')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: num.startsWith('4.1') ? num : '4.1.1', clauseTitle: '11 KV OUTDOOR LOAD BREAK SWITCH' }
+  }
+  if (num === '4.3' || text.includes('DISTRIBUTION TRANSFORMER')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.3', clauseTitle: 'DISTRIBUTION TRANSFORMER' }
+  }
+  if (num === '4.4' || text.includes('BUSDUCT')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.4', clauseTitle: 'LV BUSDUCT' }
+  }
+  if (num === '4.7' || text.includes('INVERTER')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.7', clauseTitle: 'INVERTERS' }
+  }
+  if (num === '4.8' || text.includes('UPS') || text.includes('UN-INTERRUPTED') || text.includes('UNINTERRUPTED')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.8', clauseTitle: 'UN-INTERRUPTED POWER SUPPLY (UPS) SYSTEM' }
+  }
+  if (num === '4.9' || text.includes('CHARGER') || text.includes('BATTERY')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.9', clauseTitle: 'BATTERY & BATTERY CHARGER' }
+  }
+  if (num === '4.10' || (text.includes('MOTOR') && !text.includes('STARTER') && !text.includes('MCC') && !text.includes('PMCC') && !num.startsWith('4.5'))) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.10', clauseTitle: 'MV / LV MOTORS' }
+  }
+  if (num === '4.11' || text.includes('CONTROL STATION')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.11', clauseTitle: 'LOCAL CONTROL STATION' }
+  }
+  if (num === '4.12' || text.includes('FLAME PROOF') || text.includes('EXPLOSION PROOF')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.12', clauseTitle: 'FLAME PROOF / EXPLOSION PROOF EQUIPMENT' }
+  }
+  if (num === '4.13' || text.includes('PACKAGE UNIT')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.13', clauseTitle: 'PACKAGE UNITS EQUIPMENT' }
+  }
+  if (text.includes('POWER &  /') || text.includes('PMCC') || text.includes('MCC')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.5', clauseTitle: 'POWER & MOTOR CONTROL CENTER / MOTOR CONTROL CENTER' }
+  }
+  if (text.includes('LIGHTING DISTRIBUTION BOARD') || text.includes('POWER DISTRIBUTION BOARD')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.6', clauseTitle: 'MAIN LIGHTING / POWER DISTRIBUTION BOARD' }
+  }
+  if (text.includes('LOAD BREAK SWITCH')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.1.1', clauseTitle: '11 KV OUTDOOR LOAD BREAK SWITCH' }
+  }
+  if (text.includes('SWITCHYARD') && !num.startsWith('2.')) {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.1', clauseTitle: '11KV OUTDOOR SWITCHYARD EQUIPMENTS' }
+  }
+  if (text.includes('ELECTRICAL EQUIPMENT') || num === '4.0' || num === '4') {
+    return { groupKey: '4', groupNum: '4.0', groupTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS', clauseNum: '4.0', clauseTitle: 'SPECIFICATION OF ELECTRICAL EQUIPMENTS' }
+  }
+
+  // 2.0 GENERAL & DESIGN CONDITIONS
+  if (num === '2.0' || (text === 'GENERAL' && !num.startsWith('4.'))) {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.0', clauseTitle: 'GENERAL' }
+  }
+  if (text.includes('STANDARDS') || text.includes('CODES') || num === '2.1') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.1', clauseTitle: 'STANDARDS AND CODES' }
+  }
+  if (text.includes('SITE CONDITIONS') || num.startsWith('2.2')) {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: num.startsWith('2.2') ? num : '2.2', clauseTitle: cleanTitle || 'SITE CONDITIONS' }
+  }
+  if (text.includes('GRID SUPPLY') || num === '2.3.1') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.3.1', clauseTitle: 'GRID SUPPLY' }
+  }
+  if (text.includes('ALTERNATE POWER') || num === '2.3.2') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.3.2', clauseTitle: 'ALTERNATE POWER SUPPLY' }
+  }
+  if (text.includes('POWER SUPPLY CONDITIONS') || num === '2.3') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.3', clauseTitle: 'POWER SUPPLY CONDITIONS' }
+  }
+  if (num.startsWith('2.4')) {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: num, clauseTitle: cleanTitle }
+  }
+  if (text.includes('UTILIZATION VOLTAGES')) {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.4', clauseTitle: 'UTILIZATION VOLTAGES' }
+  }
+  if (text.includes('CRITICAL LOAD') && (text.includes('C1') || num === '2.5.1')) {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.5.1', clauseTitle: 'CRITICAL LOAD "C1"' }
+  }
+  if (text.includes('SEMI-CRITICAL') || text.includes('C2') || num === '2.5.2') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.5.2', clauseTitle: 'SEMI-CRITICAL LOAD "C2"' }
+  }
+  if (text.includes('NON-CRITICAL') || text.includes('C3') || num === '2.5.3') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.5.3', clauseTitle: 'NON-CRITICAL LOAD "C3"' }
+  }
+  if (text.includes('LOAD CLASSIFICATION') || num === '2.5') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.5', clauseTitle: 'LOAD CLASSIFICATION' }
+  }
+  if (text.includes('ZONE 0') || num === '2.6.1') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.6.1', clauseTitle: 'HAZARDOUS AREA ZONE 0' }
+  }
+  if (text.includes('ZONE 1') || num === '2.6.2') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.6.2', clauseTitle: 'HAZARDOUS AREA ZONE 1' }
+  }
+  if (text.includes('ZONE 2') || num === '2.6.3') {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.6.3', clauseTitle: 'HAZARDOUS AREA ZONE 2' }
+  }
+  if (text.includes('HAZARDOUS') || num.startsWith('2.6')) {
+    return { groupKey: '2', groupNum: '2.0', groupTitle: 'GENERAL & DESIGN CONDITIONS', clauseNum: '2.6', clauseTitle: 'HAZARDOUS AREA CLASSIFICATION' }
+  }
+
+  // 3.0 POWER DISTRIBUTION PHILOSOPHY
+  if (text.includes('PRIMARY DISTRIBUTION') || num === '3.1.1') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.1.1', clauseTitle: 'PRIMARY DISTRIBUTION' }
+  }
+  if (text.includes('SECONDARY DISTRIBUTION') || num === '3.1.2') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.1.2', clauseTitle: 'SECONDARY DISTRIBUTION' }
+  }
+  if (text.includes('POWER DISTRIBUTION') || num === '3.0' || num === '3.1') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.1', clauseTitle: 'POWER DISTRIBUTION PHILOSOPHY' }
+  }
+  if (text.includes('VOLTAGE DROP') || num.startsWith('3.2.1')) {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.2.1', clauseTitle: 'VOLTAGE DROPS' }
+  }
+  if (text.includes('CABLING SYSTEM') || num === '3.2.2') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.2.2', clauseTitle: 'CABLING SYSTEM' }
+  }
+  if (text.includes('CABLE GLANDING') || num === '3.2.3') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.2.3', clauseTitle: 'CABLE GLANDING & TERMINATION' }
+  }
+  if (text === 'CABLES' || num === '3.2') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.2', clauseTitle: 'CABLES' }
+  }
+  if (text.includes('ENVIRONMENTAL CONDITIONS') || num === '3.3.1') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.3.1', clauseTitle: 'ELECTRICAL ROOMS - ENVIRONMENTAL CONDITIONS' }
+  }
+  if (text.includes('TRANSFORMER AREA') || num === '3.3.2') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.3.2', clauseTitle: 'TRANSFORMER AREA - GENERAL REQUIREMENTS' }
+  }
+  if (text.includes('ELECTRICAL ROOM') || num === '3.3') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.3', clauseTitle: 'ELECTRICAL ROOMS / TRANSFORMER AREA' }
+  }
+  if (text.includes('GROUNDING') || text.includes('LIGHTNING') || num === '3.4') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.4', clauseTitle: 'GROUNDING AND LIGHTNING PROTECTION' }
+  }
+  if ((text.includes('START') && text.includes('STOP')) || num === '3.5') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.5', clauseTitle: 'START / STOP PHILOSOPHY' }
+  }
+  if (text.includes('RECEPTACLE') || num === '3.6') {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.6', clauseTitle: 'CONVENIENCE RECEPTACLES' }
+  }
+  if (text.includes('DESIGN PHILOSOPHY')) {
+    return { groupKey: '3', groupNum: '3.0', groupTitle: 'POWER DISTRIBUTION PHILOSOPHY', clauseNum: '3.0', clauseTitle: 'DESIGN PHILOSOPHY' }
+  }
+
+  // Dynamic Content Page matching (for spec 02, spec 03, or custom templates)
+  const numMatch = (num || text).match(/^(\d+)(?:\.(\d+))?/)
+  if (numMatch) {
+    const top = numMatch[1]
+    const sub = numMatch[2]
+    const clauseNum = num || (sub ? `${top}.${sub}` : `${top}.0`)
+
+    // Check if contentPage has a matching item
+    const cpItem = contentPage?.find(cp => cp.number.split('.')[0] === top)
+    if (cpItem) {
+      return {
+        groupKey: top,
+        groupNum: cpItem.number,
+        groupTitle: cpItem.title.toUpperCase(),
+        clauseNum,
+        clauseTitle: cleanTitle || cpItem.title.toUpperCase()
+      }
+    }
+
+    const canon = CANONICAL_SPEC01_TOC[top]
+    if (canon) {
+      return {
+        groupKey: top,
+        groupNum: canon.num,
+        groupTitle: canon.title,
+        clauseNum,
+        clauseTitle: cleanTitle
+      }
+    }
+
+    return {
+      groupKey: top,
+      groupNum: `${top}.0`,
+      groupTitle: cleanTitle,
+      clauseNum,
+      clauseTitle: cleanTitle
+    }
+  }
+
+  return {
+    groupKey: 'other',
+    groupNum: '—',
+    groupTitle: 'ADDITIONAL SECTIONS',
+    clauseNum: num || '—',
+    clauseTitle: cleanTitle
+  }
+}
+
+export function parseClauseParts(numStr: string): (number | string)[] {
+  return numStr.split(/[\.\s]+/).map(p => {
+    const n = parseInt(p, 10)
+    return isNaN(n) ? p : n
+  })
+}
+
+export function compareClauses(a: string, b: string): number {
+  const pa = parseClauseParts(a)
+  const pb = parseClauseParts(b)
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const va = pa[i]
+    const vb = pb[i]
+    if (va === undefined) return -1
+    if (vb === undefined) return 1
+    if (typeof va === 'number' && typeof vb === 'number') {
+      if (va !== vb) return va - vb
+    } else {
+      const cmp = String(va).localeCompare(String(vb))
+      if (cmp !== 0) return cmp
+    }
+  }
+  return 0
 }
 
 function confidencePct(ef: ExtractedField | BtFieldBinding | undefined): number | null {
@@ -320,7 +705,6 @@ function FieldInput({
   onSave,
   compact = false,
 }: FieldInputProps) {
-  const [showSrc, setShowSrc] = useState(false)
   const { isMissing, isDefault, isReview, isVerified } = fieldStatus(
     value,
     origExtracted,
@@ -332,7 +716,7 @@ function FieldInput({
   return (
     <div
       id={`field-${fieldId}`}
-      className={`rounded-xl border transition-all duration-150 ${
+      className={`rounded-lg border transition-all duration-150 px-3 py-1.5 ${
         isMissing
           ? 'bg-red-50/50 border-red-200'
           : isDefault
@@ -340,40 +724,75 @@ function FieldInput({
           : isReview
           ? 'bg-amber-50/40 border-amber-200'
           : 'bg-white border-slate-200/90 hover:border-slate-300'
-      } ${compact ? 'p-3' : 'p-4'}`}
+      }`}
     >
-      {/* Label and Status Badges */}
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-        <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+      <div className="flex items-center gap-2.5">
+        {/* 1. Field Label (Left, compact & snug) */}
+        <label
+          title={label}
+          className="w-44 md:w-52 flex-shrink-0 text-xs font-bold text-slate-800 uppercase tracking-wide truncate"
+        >
           {label}
         </label>
-        <div className="flex items-center gap-1.5 flex-wrap">
+
+        {/* 2. Value Input (Center, flexible) */}
+        <div className="flex-1 min-w-0">
+          <textarea
+            className={`w-full rounded-md border px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 resize-y transition-colors min-h-[28px] ${
+              isMissing
+                ? 'border-red-300 bg-white focus:border-red-500 focus:ring-red-100'
+                : isDefault
+                ? 'border-indigo-200 bg-indigo-50/15 focus:border-indigo-400 focus:ring-indigo-100 focus:bg-white'
+                : 'border-slate-200 bg-slate-50 focus:border-blue-400 focus:ring-blue-100 focus:bg-white'
+            }`}
+            rows={value.length > 80 ? 2 : 1}
+            value={value}
+            placeholder={isMissing ? '— Missing value — enter manually' : ''}
+            onChange={e => onChange(e.target.value)}
+            onBlur={onSave}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                onSave()
+              }
+            }}
+          />
+        </div>
+
+        {/* 3. Status Badges & Source (Far Right, exactly where user arrow points) */}
+        <div className="flex-shrink-0 flex items-center gap-1.5">
           {isDefault && (
             <span
-              className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[10px] font-bold flex items-center gap-1"
+              className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[9px] font-bold"
               title="Not found in document — pre-filled with template default value"
             >
-              📋 DEFAULT VALUE
+              DEFAULT
             </span>
           )}
           {isMissing && (
-            <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-[10px] font-bold">
-              🔴 MISSING
+            <span
+              className="px-1.5 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-[9px] font-bold"
+            >
+              MISSING
             </span>
           )}
           {isReview && (
-            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-200 rounded-full text-[10px] font-semibold">
-              ⚠️ REVIEW
+            <span
+              className="px-1.5 py-0.5 bg-amber-100 text-amber-700 border border-amber-200 rounded-full text-[9px] font-semibold"
+            >
+              REVIEW
             </span>
           )}
           {isVerified && (
-            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-semibold">
+            <span
+              className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full text-[9px] font-semibold"
+            >
               ✓ VERIFIED
             </span>
           )}
           {confidence != null && (
             <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+              className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ${
                 confidence >= 90
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : confidence >= 70
@@ -384,63 +803,44 @@ function FieldInput({
               {confidence}%
             </span>
           )}
-          {sourceRef?.page_number && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border bg-blue-50 text-blue-700 border-blue-200">
-              p.{sourceRef.page_number}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Editable Textarea / Input */}
-      <textarea
-        className={`w-full rounded-lg border px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 resize-y transition-colors min-h-[36px] ${
-          isMissing
-            ? 'border-red-300 bg-white focus:border-red-500 focus:ring-red-100'
-            : isDefault
-            ? 'border-indigo-200 bg-indigo-50/15 focus:border-indigo-400 focus:ring-indigo-100 focus:bg-white'
-            : 'border-slate-200 bg-slate-50 focus:border-blue-400 focus:ring-blue-100 focus:bg-white'
-        }`}
-        rows={value.length > 80 ? 3 : 1}
-        value={value}
-        placeholder={isMissing ? '— Missing value — enter manually' : ''}
-        onChange={e => onChange(e.target.value)}
-        onBlur={onSave}
-        onKeyDown={e => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            onSave()
-          }
-        }}
-      />
-
-      {/* Default Notice for the user */}
-      {isDefault && (
-        <p className="text-[11px] text-indigo-700 mt-1.5 flex items-center gap-1.5 font-sans">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-          <span>Using template default value (not extracted from uploaded document). You can keep or edit it.</span>
-        </p>
-      )}
-
-      {/* Source Reference Toggle */}
-      {sourceRef?.source_text && (
-        <div className="mt-1.5">
-          <button
-            onClick={() => setShowSrc(v => !v)}
-            className="text-[11px] text-blue-600 hover:text-blue-800 font-medium"
-          >
-            🔍 {showSrc ? 'Hide' : 'Show'} source
-          </button>
-          {showSrc && (
-            <div className="mt-1 p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-[11px] font-mono text-slate-700 whitespace-pre-wrap">
-              <span className="text-[10px] font-sans font-bold text-slate-500 uppercase block mb-0.5">
-                Source (p.{sourceRef.page_number ?? '?'})
+          {(sourceRef?.page_number || sourceRef?.source_text) && (
+            <div className="relative group/src inline-block">
+              <span
+                className="cursor-pointer px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border bg-blue-50 text-blue-700 border-blue-200 group-hover/src:bg-blue-600 group-hover/src:text-white group-hover/src:border-blue-600 transition-all shadow-2xs inline-flex items-center gap-1"
+                title={sourceRef?.source_text ? `Source (p.${sourceRef.page_number ?? '?'}): "${sourceRef.source_text}"` : `Page ${sourceRef?.page_number ?? '?'}`}
+              >
+                <span>p.{sourceRef?.page_number ?? 1}</span>
               </span>
-              "{sourceRef.source_text}"
+              {sourceRef?.source_text && (
+                <div className="pointer-events-none absolute bottom-full right-0 mb-2.5 hidden group-hover/src:block z-50 w-80 sm:w-96 max-w-sm rounded-xl shadow-2xl shadow-blue-900/15 border border-blue-200/90 bg-white overflow-visible transition-all">
+                  {/* Subtle pointing arrow */}
+                  <div className="absolute -bottom-1.5 right-4 w-3 h-3 bg-white border-b border-r border-blue-200/90 rotate-45" />
+
+                  {/* Header in project brand blue accent */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50/60 px-3.5 py-2 border-b border-blue-100 flex items-center justify-between rounded-t-xl">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      <span className="text-[10px] font-bold text-blue-950 uppercase tracking-wider">
+                        Document Source Excerpt
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-white text-blue-700 border border-blue-200 shadow-2xs">
+                      Page {sourceRef.page_number ?? '?'}
+                    </span>
+                  </div>
+
+                  {/* Body with soft quote and highlight border */}
+                  <div className="p-3 bg-white rounded-b-xl">
+                    <div className="border-l-2 border-blue-500 bg-blue-50/30 rounded-r-lg pl-3 pr-2.5 py-2 text-slate-800 text-xs font-medium leading-relaxed font-sans max-h-48 overflow-y-auto">
+                      “{sourceRef.source_text}”
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -820,168 +1220,191 @@ function CoverPageCard({
   )
 }
 
-// ─── Editable Static Paragraph Component ─────────────────────────────────────
+// ─── Grouped Static Text Editor Component ─────────────────────────────────────
 
-interface EditableStaticParagraphProps {
-  block: BtBlock
+export interface StaticTextGroupEditorProps {
+  blocks: BtBlock[]
   jobId: string
   onBlockUpdate?: (blockId: string, newText: string) => void
-  highlightEditable?: boolean
 }
 
-function EditableStaticParagraph({
-  block,
+export function StaticTextGroupEditor({
+  blocks,
   jobId,
   onBlockUpdate,
-  highlightEditable = false,
-}: EditableStaticParagraphProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [draftText, setDraftText] = useState(block.text || '')
+}: StaticTextGroupEditorProps) {
+  // Combine all paragraphs separated by blank lines
+  const initialText = useMemo(() => {
+    return blocks
+      .map(b => (b.text || '').trim())
+      .filter(Boolean)
+      .join('\n\n')
+  }, [blocks])
+
+  const [draftText, setDraftText] = useState(initialText)
+  const [isDirty, setIsDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
-  const isEdited = Boolean(block.is_edited || (block.original_text && block.text !== block.original_text))
+  const isCancelingRef = React.useRef(false)
 
   useEffect(() => {
-    setDraftText(block.text || '')
-  }, [block.text])
+    if (!isDirty) {
+      setDraftText(initialText)
+    }
+  }, [initialText, isDirty])
 
   const handleSave = async () => {
-    if (!draftText.trim()) return
-    setSaving(true)
-    try {
-      await patchBlockText(jobId, block.block_id, draftText)
-      onBlockUpdate?.(block.block_id, draftText)
-      setIsEditing(false)
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 2500)
-    } catch (err) {
-      console.error('Failed to update static paragraph:', err)
-      alert(`Failed to save: ${(err as Error).message}`)
-    } finally {
-      setSaving(false)
+    if (saving) return
+    const trimmed = draftText.trim()
+    if (!trimmed) return
+    if (draftText === initialText) {
+      setIsDirty(false)
+      return
     }
-  }
 
-  const handleReset = async () => {
-    if (!block.original_text) return
-    if (!window.confirm('Reset this paragraph back to its original template text?')) return
     setSaving(true)
     try {
-      await patchBlockText(jobId, block.block_id, block.original_text)
-      setDraftText(block.original_text)
-      onBlockUpdate?.(block.block_id, block.original_text)
-      setIsEditing(false)
+      if (blocks.length > 0) {
+        // Save full combined text to the first block
+        const primaryBlock = blocks[0]
+        await patchBlockText(jobId, primaryBlock.block_id, draftText)
+        onBlockUpdate?.(primaryBlock.block_id, draftText)
+
+        // Clear any subsequent blocks in this group so they don't duplicate
+        for (let i = 1; i < blocks.length; i++) {
+          const b = blocks[i]
+          if (b.text && b.text.trim()) {
+            await patchBlockText(jobId, b.block_id, '')
+            onBlockUpdate?.(b.block_id, '')
+          }
+        }
+      }
+
+      setIsDirty(false)
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 2500)
     } catch (err) {
-      console.error('Failed to reset static paragraph:', err)
-      alert(`Failed to reset: ${(err as Error).message}`)
+      console.error('Failed to save static text:', err)
+      alert(`Failed to save text: ${(err as Error).message}`)
     } finally {
       setSaving(false)
     }
   }
 
   const handleCancel = () => {
-    setDraftText(block.text || '')
-    setIsEditing(false)
+    isCancelingRef.current = true
+    setDraftText(initialText)
+    setIsDirty(false)
+    setTimeout(() => {
+      isCancelingRef.current = false
+    }, 150)
   }
 
-  if (isEditing) {
-    return (
-      <div className="my-2 p-3 bg-blue-50/40 border-2 border-blue-400/80 rounded-xl shadow-xs transition-all">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
-            <Pencil className="w-3.5 h-3.5 text-blue-600" />
-            <span>Editing Static Paragraph</span>
-          </div>
-          {block.original_text && block.original_text !== draftText && (
-            <button
-              type="button"
-              onClick={handleReset}
-              disabled={saving}
-              className="text-[11px] font-medium text-slate-500 hover:text-amber-700 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-amber-50 transition-colors"
-              title="Revert to original template text"
-            >
-              <RotateCcw className="w-3 h-3" />
-              Reset to original
-            </button>
+  const handleBlur = () => {
+    if (isCancelingRef.current) return
+    if (isDirty && draftText.trim() && draftText !== initialText) {
+      handleSave()
+    }
+  }
+
+  const lineCount = draftText.split('\n').length
+  const dynamicRows = Math.max(2, Math.min(8, lineCount))
+
+  return (
+    <div className="rounded-lg border border-slate-200/90 bg-white p-2.5 shadow-2xs transition-all hover:border-slate-300">
+      <textarea
+        value={draftText}
+        onChange={e => {
+          setDraftText(e.target.value)
+          setIsDirty(true)
+        }}
+        onBlur={handleBlur}
+        rows={dynamicRows}
+        className="w-full p-2 text-xs md:text-sm font-sans text-slate-800 bg-slate-50/40 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-md leading-relaxed resize-y transition-colors outline-none"
+        placeholder="Enter paragraph text..."
+      />
+
+      {/* Footer controls: tick and wrong icon below, auto-save status */}
+      <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-slate-100">
+        <div className="flex items-center gap-2">
+          {saveSuccess && (
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+              <Check className="w-3 h-3" /> Saved
+            </span>
+          )}
+          {saving && (
+            <span className="text-[10px] text-slate-500 flex items-center gap-1.5 font-medium">
+              <span className="w-2.5 h-2.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              Saving...
+            </span>
+          )}
+          {isDirty && !saving && !saveSuccess && (
+            <span className="text-[10px] text-slate-400 italic">
+              Unsaved — click outside or (✓) to save
+            </span>
           )}
         </div>
-        <textarea
-          value={draftText}
-          onChange={e => setDraftText(e.target.value)}
-          rows={Math.max(2, Math.min(8, Math.ceil((draftText.length || 1) / 75)))}
-          className="w-full p-2.5 text-xs font-sans text-slate-800 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent leading-relaxed"
-          placeholder="Enter paragraph text..."
-          autoFocus
-        />
-        <div className="flex items-center justify-end gap-2 mt-2">
+
+        <div className="flex items-center gap-1 ml-auto">
+          {/* Wrong / Cancel icon */}
           <button
             type="button"
-            onClick={handleCancel}
-            disabled={saving}
-            className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors flex items-center gap-1"
+            onMouseDown={e => {
+              e.preventDefault()
+              handleCancel()
+            }}
+            disabled={!isDirty || saving}
+            className="p-1 rounded-md border border-slate-200 text-slate-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 disabled:opacity-30 disabled:pointer-events-none transition-colors shadow-2xs"
+            title="Cancel / Revert changes (Wrong icon)"
           >
             <X className="w-3.5 h-3.5" />
-            Cancel
           </button>
+
+          {/* Tick / Save icon */}
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || !draftText.trim()}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-xs transition-colors flex items-center gap-1"
+            disabled={!isDirty || saving}
+            className="p-1 rounded-md border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 disabled:opacity-30 disabled:pointer-events-none transition-colors shadow-2xs"
+            title="Save text (Tick icon)"
           >
-            {saving ? (
-              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Check className="w-3.5 h-3.5" />
-            )}
-            Save Changes
+            <Check className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
-    )
-  }
-
-  return (
-    <div
-      className={`group relative rounded-lg py-1 px-1.5 transition-all flex items-start justify-between gap-3 ${
-        highlightEditable
-          ? 'bg-blue-50/20 hover:bg-blue-50/50 border border-dashed border-blue-300 hover:border-blue-500'
-          : 'hover:bg-slate-100/70 border border-transparent hover:border-slate-200'
-      }`}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-700 leading-relaxed font-sans select-text">
-          {block.text}
-        </p>
-        <div className="flex items-center gap-2 mt-0.5">
-          {isEdited && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-              ✓ Edited static text
-            </span>
-          )}
-          {saveSuccess && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
-              ✓ Saved
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className={`flex-shrink-0 flex items-center gap-1 transition-opacity ${highlightEditable ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-        <button
-          type="button"
-          onClick={() => setIsEditing(true)}
-          className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 rounded shadow-2xs transition-colors"
-          title="Edit this static text"
-        >
-          <Pencil className="w-3 h-3" />
-          <span>Edit</span>
-        </button>
-      </div>
     </div>
   )
+}
+
+export type GroupedBlockItem =
+  | { type: 'field'; block: BtBlock }
+  | { type: 'table'; block: BtBlock }
+  | { type: 'static_group'; blocks: BtBlock[] }
+
+export function groupBlocks(blocks: BtBlock[]): GroupedBlockItem[] {
+  const items: GroupedBlockItem[] = []
+  let currentStatic: BtBlock[] = []
+
+  function flushStatic() {
+    if (currentStatic.length > 0) {
+      items.push({ type: 'static_group', blocks: [...currentStatic] })
+      currentStatic = []
+    }
+  }
+
+  for (const b of blocks) {
+    if (b.field_binding?.field_id) {
+      flushStatic()
+      items.push({ type: 'field', block: b })
+    } else if (b.block_type === 'table' && b.table_data && b.table_data.length > 0) {
+      flushStatic()
+      items.push({ type: 'table', block: b })
+    } else if (b.text && b.text.trim()) {
+      currentStatic.push(b)
+    }
+  }
+  flushStatic()
+  return items
 }
 
 // ─── Block Renderer Component ─────────────────────────────────────────────────
@@ -1281,15 +1704,14 @@ function BlockRenderer({
     )
   }
 
-  // 3. Regular document text paragraph (with optional inline editing)
+  // 3. Regular document text paragraph (with unified editor, tick & wrong icons, auto-save on blur)
   if (text && text.trim()) {
     if (activeFilter !== 'all') return null
     return (
-      <EditableStaticParagraph
-        block={block}
+      <StaticTextGroupEditor
+        blocks={[block]}
         jobId={jobId}
         onBlockUpdate={onBlockUpdate}
-        highlightEditable={enableStaticEditing}
       />
     )
   }
@@ -1297,11 +1719,45 @@ function BlockRenderer({
   return null
 }
 
-// ─── BtSectionCard Component ──────────────────────────────────────────────────
+// ─── SubsectionCard & TopLevelGroupAccordion (Reference Images 3 & 4) ────────
 
-interface BtSectionCardProps {
-  sec: BtSection
-  level?: number
+export interface GroupSectionItem {
+  id: string
+  clauseNum: string
+  clauseTitle: string
+  source: 'doc' | 'tmpl'
+  btSec?: BtSection
+  tmplSec?: SchemaSection
+  matchedTemplateSec?: SchemaSection | null
+  fieldIds: string[]
+  defaultCount: number
+}
+
+export interface SectionBranch {
+  branchKey: string
+  branchNum: string
+  branchTitle: string
+  items: GroupSectionItem[]
+  isBranchContainer: boolean
+  totalSections: number
+  defaultCount: number
+  hasMatchingFilter: boolean
+}
+
+export interface SectionGroup {
+  groupKey: string
+  groupIndex: number
+  groupNum: string
+  groupTitle: string
+  branches: SectionBranch[]
+  sections: GroupSectionItem[]
+  totalSections: number
+  defaultCount: number
+  hasMatchingFilter: boolean
+}
+
+interface SubsectionCardProps {
+  secItem: GroupSectionItem
   jobId: string
   extractedMap: Map<string, ExtractedField>
   fieldValues: Record<string, string>
@@ -1316,12 +1772,10 @@ interface BtSectionCardProps {
   saving: boolean
   expanded: boolean
   onToggle: () => void
-  matchedTemplateSec?: SchemaSection | null
 }
 
-function BtSectionCard({
-  sec,
-  level = 0,
+function SubsectionCard({
+  secItem,
   jobId,
   extractedMap,
   fieldValues,
@@ -1336,60 +1790,17 @@ function BtSectionCard({
   saving,
   expanded,
   onToggle,
-  matchedTemplateSec,
-}: BtSectionCardProps) {
-  const headingText = sec.heading_text || 'Section'
-  const { num, title } = parseSectionName(sec.section_number ? `${sec.section_number} ${headingText}` : headingText)
+}: SubsectionCardProps) {
+  const { clauseNum, clauseTitle, btSec, tmplSec, matchedTemplateSec, fieldIds, defaultCount } = secItem
 
-  // Collect all field IDs in this section and its subsections
-  const fieldIds = useMemo(() => {
-    const ids: string[] = []
-    function gather(s: BtSection) {
-      for (const b of s.blocks) {
-        if (b.field_binding?.field_id) ids.push(b.field_binding.field_id)
-        if (b.row_bindings) {
-          for (const rb of Object.values(b.row_bindings)) {
-            if (rb.field_id) ids.push(rb.field_id)
-          }
-        }
-        if (b.cell_bindings) {
-          for (const cb of Object.values(b.cell_bindings)) {
-            if (cb.field_id) ids.push(cb.field_id)
-          }
-        }
-      }
-      s.subsections.forEach(gather)
-    }
-    gather(sec)
-    // If no block bindings, include matched template fields
-    if (ids.length === 0 && matchedTemplateSec?.fields) {
-      ids.push(...matchedTemplateSec.fields.map(f => f.field_id))
-    }
-    // Also include matched template table row cells
-    if (ids.length === 0 && matchedTemplateSec?.rows) {
-      for (const r of matchedTemplateSec.rows) {
-        for (let ci = 0; ci < (r.values ?? []).length; ci++) {
-          ids.push(`${matchedTemplateSec.section_id}__${r.row_id}__col${ci}`)
-        }
-      }
-    }
-    return Array.from(new Set(ids))
-  }, [sec, matchedTemplateSec])
+  // State for template table rows if tmplSec has rows
+  const [tmplRows, setTmplRows] = useState(tmplSec?.rows || matchedTemplateSec?.rows || [])
+  useEffect(() => {
+    setTmplRows(tmplSec?.rows || matchedTemplateSec?.rows || [])
+  }, [tmplSec?.rows, matchedTemplateSec?.rows])
 
-  // Count default fields for badge
-  const defaultCount = useMemo(() => {
-    return fieldIds.filter(fid => {
-      const ef = extractedMap.get(fid)
-      const defVal = ef?.default_value ?? ''
-      const val = fieldValues[fid] ?? ef?.value ?? defVal
-      const orig = ef?.original_value ?? ef?.value ?? ''
-      const { isDefault } = fieldStatus(val, orig, confidencePct(ef), ef?.validation_status, defVal)
-      return isDefault
-    }).length
-  }, [fieldIds, fieldValues, extractedMap])
-
-  // Check if section contains any field matching the active filter
-  const hasMatchingFilterField = useMemo(() => {
+  // Check matching filter
+  const hasMatchingFilter = useMemo(() => {
     if (activeFilter === 'all') return true
     for (const fid of fieldIds) {
       const ef = extractedMap.get(fid)
@@ -1404,13 +1815,13 @@ function BtSectionCard({
     return false
   }, [fieldIds, activeFilter, fieldValues, extractedMap])
 
-  if (!hasMatchingFilterField) return null
+  if (!hasMatchingFilter) return null
 
-  // Filter check
+  // Search check
   const matchesSearch =
     !searchQuery ||
-    title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    num.includes(searchQuery) ||
+    clauseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    clauseNum.includes(searchQuery) ||
     fieldIds.some(fid => {
       const ef = extractedMap.get(fid)
       return (
@@ -1422,49 +1833,35 @@ function BtSectionCard({
 
   if (!matchesSearch) return null
 
-  // If section has 0 blocks and 0 subsections and NO template fields or rows, hide it!
-  const hasContent =
-    sec.blocks.length > 0 ||
-    sec.subsections.length > 0 ||
-    (matchedTemplateSec && (matchedTemplateSec.fields.length > 0 || (matchedTemplateSec.rows && matchedTemplateSec.rows.length > 0)))
-  if (!hasContent) return null
-
-  const isChild = level > 0
+  const activeTmpl = tmplSec || matchedTemplateSec
+  const isTableSection = activeTmpl?.field_type === 'table' || (activeTmpl?.columns && activeTmpl.columns.length > 0)
+  const hasBlocks = Boolean(btSec && btSec.blocks && btSec.blocks.length > 0)
 
   return (
-    <div className={`rounded-2xl border transition-all ${
-      isChild ? 'border-slate-200/80 bg-white ml-3 shadow-none' : 'border-slate-200 bg-white shadow-sm overflow-hidden'
-    }`}>
-      {/* Header button */}
+    <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden transition-all">
+      {/* Header button matching Image 4 */}
       <button
         type="button"
         onClick={onToggle}
-        className={`w-full flex items-center justify-between text-left transition-colors ${
-          isChild ? 'px-4 py-2.5 hover:bg-slate-50/80' : 'px-5 py-3.5 hover:bg-slate-50/60'
-        }`}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50/70 transition-colors"
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {num ? (
-            <span className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shadow-sm">
-              {num.split('.')[0]}
-            </span>
-          ) : (
-            <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-400 text-white text-[11px] font-bold flex items-center justify-center">
-              §
-            </span>
-          )}
-          <span className={`font-bold text-slate-900 uppercase tracking-wide truncate ${isChild ? 'text-xs' : 'text-sm'}`}>
-            {num ? `${num}   ${title}` : title}
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          {/* Light-blue numerical badge */}
+          <span className="flex-shrink-0 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold font-mono tracking-tight shadow-2xs">
+            {clauseNum}
           </span>
-          {defaultCount > 0 && (
-            <span className="flex-shrink-0 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[10px] font-bold">
-              {defaultCount} default
-            </span>
-          )}
+
+          {/* Clean uppercase title */}
+          <span className="font-bold text-slate-900 uppercase tracking-wide text-xs md:text-sm truncate">
+            {clauseTitle}
+          </span>
+
         </div>
 
         <svg
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ml-3 ${expanded ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ml-3 flex-shrink-0 ${
+            expanded ? 'rotate-180' : ''
+          }`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -1474,30 +1871,165 @@ function BtSectionCard({
         </svg>
       </button>
 
-      {/* Section body */}
+      {/* Expanded Card Body */}
       {expanded && (
-        <div className="border-t border-slate-100 px-5 py-4 bg-slate-50/20 space-y-3">
-          {/* Render blocks if available */}
-          {sec.blocks.map(block => (
-            <BlockRenderer
-              key={block.block_id}
-              block={block}
-              jobId={jobId}
-              extractedMap={extractedMap}
-              fieldValues={fieldValues}
-              activeFilter={activeFilter}
-              onFieldChange={onFieldChange}
-              onSave={onSave}
-              onBlockUpdate={onBlockUpdate}
-              onBlockTableUpdate={onBlockTableUpdate}
-              enableStaticEditing={enableStaticEditing}
-            />
-          ))}
+        <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/20 space-y-2">
+          {/* 1. Document blocks if present */}
+          {hasBlocks && btSec &&
+            groupBlocks(btSec.blocks).map((item, idx) => {
+              if (item.type === 'static_group') {
+                if (activeFilter !== 'all') return null
+                return (
+                  <StaticTextGroupEditor
+                    key={`static_${item.blocks[0]?.block_id || idx}`}
+                    blocks={item.blocks}
+                    jobId={jobId}
+                    onBlockUpdate={onBlockUpdate}
+                  />
+                )
+              }
+              if (item.type === 'table') {
+                return (
+                  <EditableTableBlock
+                    key={item.block.block_id}
+                    block={item.block}
+                    jobId={jobId}
+                    extractedMap={extractedMap}
+                    fieldValues={fieldValues}
+                    onFieldChange={onFieldChange}
+                    onSave={onSave}
+                    onBlockTableUpdate={onBlockTableUpdate}
+                    activeFilter={activeFilter}
+                  />
+                )
+              }
+              if (item.type === 'field') {
+                return (
+                  <BlockRenderer
+                    key={item.block.block_id}
+                    block={item.block}
+                    jobId={jobId}
+                    extractedMap={extractedMap}
+                    fieldValues={fieldValues}
+                    activeFilter={activeFilter}
+                    onFieldChange={onFieldChange}
+                    onSave={onSave}
+                    onBlockUpdate={onBlockUpdate}
+                    onBlockTableUpdate={onBlockTableUpdate}
+                    enableStaticEditing={enableStaticEditing}
+                  />
+                )
+              }
+              return null
+            })}
 
-          {/* If section blocks are empty, render matched template fields! */}
-          {sec.blocks.length === 0 && matchedTemplateSec?.fields && matchedTemplateSec.fields.length > 0 && (
-            <div className="space-y-3">
-              {matchedTemplateSec.fields.map(field => {
+          {/* 2. Fallback for 2.0 GENERAL if 0 blocks */}
+          {!hasBlocks && clauseNum === '2.0' && (
+            <div className="py-1 px-1.5 flex items-start justify-between gap-3 bg-slate-50/50 rounded-lg">
+              <p className="text-xs text-slate-700 leading-relaxed font-sans select-text">
+                All electrical equipment shall be designed for continuous operation at rated output under the specified site conditions.
+              </p>
+            </div>
+          )}
+
+          {/* 3. Pure template table section OR document section with 0 blocks matching template table */}
+          {(!hasBlocks || !btSec?.blocks.some(b => b.block_type === 'table')) && isTableSection && activeTmpl?.columns && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm my-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-800 text-white text-[11px] font-bold">
+                      {activeTmpl.columns.map((col, ci) => (
+                        <th key={ci} className="px-3 py-2 text-left border-r border-slate-700 last:border-0 uppercase tracking-wider">
+                          {col}
+                        </th>
+                      ))}
+                      <th className="px-2 py-2 text-center w-12 border-l border-slate-700 uppercase tracking-wider text-slate-400 font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tmplRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={activeTmpl.columns.length + 1} className="py-5 text-center text-xs text-slate-400 italic">
+                          No rows in this table. Click "+ Add Row" to insert a row.
+                        </td>
+                      </tr>
+                    ) : (
+                      tmplRows.map((row, ri) => (
+                        <tr key={ri} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">
+                          {row.values.map((cell, ci) => {
+                            const cellFid = `${activeTmpl.section_id}__${row.row_id}__col${ci}`
+                            const ef = extractedMap.get(cellFid)
+                            const defVal = ef?.default_value ?? cell ?? ''
+                            const val = fieldValues[cellFid] ?? ef?.value ?? defVal
+                            const isDef = ef?.validation_status === 'default' || (Boolean(defVal) && val === defVal && (!ef || !ef.original_value))
+                            return (
+                              <td key={ci} className="p-1.5 border-r border-slate-100 last:border-0">
+                                <input
+                                  type="text"
+                                  className={`w-full px-2 py-1.5 text-xs rounded transition-all focus:outline-none focus:ring-1 ${
+                                    isDef
+                                      ? 'bg-indigo-50/50 text-indigo-900 border border-indigo-300 focus:ring-indigo-500 font-medium'
+                                      : 'bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-500'
+                                  }`}
+                                  value={val}
+                                  placeholder={activeTmpl.columns?.[ci] ? `Enter ${activeTmpl.columns[ci]}...` : ''}
+                                  onChange={e => onFieldChange(cellFid, e.target.value)}
+                                  onBlur={() => onSave(cellFid)}
+                                  title={isDef ? 'Using template default value' : undefined}
+                                />
+                              </td>
+                            )
+                          })}
+                          <td className="p-1.5 text-center w-12 border-l border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => setTmplRows(prev => prev.filter((_, idx) => idx !== ri))}
+                              title="Delete this row"
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-4 py-2 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const colCount = activeTmpl.columns?.length || 4
+                    const nextId = `row_${Date.now()}`
+                    const isCol0Serial = activeTmpl.columns?.[0]?.toLowerCase().includes('no') || activeTmpl.columns?.[0]?.toLowerCase().includes('sl')
+                    const newVals = Array(colCount).fill('')
+                    if (isCol0Serial) newVals[0] = String(tmplRows.length + 1)
+                    setTmplRows(prev => [...prev, { row_id: nextId, values: newVals }])
+                    if (isCol0Serial) {
+                      onFieldChange(`${activeTmpl.section_id}__${nextId}__col0`, String(tmplRows.length + 1))
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-white hover:bg-blue-50 rounded-lg border border-blue-200 transition-colors shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Row</span>
+                </button>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {tmplRows.length} {tmplRows.length === 1 ? 'row' : 'rows'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 4. Template fields if 0 blocks or if matched template has non-table fields */}
+          {(!hasBlocks || !btSec?.blocks.some(b => b.field_binding?.field_id)) && activeTmpl?.fields && activeTmpl.fields.length > 0 && (
+            <div className="space-y-2">
+              {activeTmpl.fields.map(field => {
                 const ef = extractedMap.get(field.field_id)
                 const orig = ef?.original_value ?? ''
                 const defVal = ef?.default_value ?? field.default_value ?? ''
@@ -1527,82 +2059,9 @@ function BtSectionCard({
             </div>
           )}
 
-          {/* If section blocks are empty, render matched template table if present! */}
-          {sec.blocks.length === 0 && matchedTemplateSec?.rows && matchedTemplateSec.rows.length > 0 && matchedTemplateSec.columns && (
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm my-2">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-800 text-white text-[11px] font-bold">
-                    {matchedTemplateSec.columns.map((col, ci) => (
-                      <th key={ci} className="px-3 py-2 text-left border-r border-slate-700 last:border-0 uppercase tracking-wider">
-                        {col}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {matchedTemplateSec.rows.map((row, ri) => (
-                    <tr key={ri} className="border-b border-slate-100 last:border-0 hover:bg-blue-50/20">
-                      {row.values.map((cell, ci) => {
-                        const cellFid = `${matchedTemplateSec.section_id}__${row.row_id}__col${ci}`
-                        const ef = extractedMap.get(cellFid)
-                        const defVal = ef?.default_value ?? cell ?? ''
-                        const val = fieldValues[cellFid] ?? ef?.value ?? defVal
-                        const isDef = ef?.validation_status === 'default' || (Boolean(defVal) && val === defVal && (!ef || !ef.original_value))
-
-                        return (
-                          <td key={ci} className="p-2 border-r border-slate-100 last:border-0">
-                            <input
-                              className={`w-full px-2 py-1 text-xs font-semibold rounded focus:outline-none focus:ring-1 ${
-                                isDef
-                                  ? 'bg-indigo-50/50 text-indigo-900 border border-indigo-300 focus:ring-indigo-500'
-                                  : 'bg-white text-slate-900 border border-slate-200 focus:ring-blue-500'
-                              }`}
-                              value={val}
-                              onChange={e => onFieldChange(cellFid, e.target.value)}
-                              onBlur={() => onSave(cellFid)}
-                              title={isDef ? 'Using template default value' : undefined}
-                            />
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Subsections */}
-          {sec.subsections.length > 0 && (
-            <div className="space-y-3 pt-2">
-              {sec.subsections.map(sub => (
-                <BtSectionCard
-                  key={sub.section_id}
-                  sec={sub}
-                  level={level + 1}
-                  jobId={jobId}
-                  extractedMap={extractedMap}
-                  fieldValues={fieldValues}
-                  activeFilter={activeFilter}
-                  searchQuery={searchQuery}
-                  onFieldChange={onFieldChange}
-                  onSave={onSave}
-                  onSaveSection={onSaveSection}
-                  onBlockUpdate={onBlockUpdate}
-                  onBlockTableUpdate={onBlockTableUpdate}
-                  enableStaticEditing={enableStaticEditing}
-                  saving={saving}
-                  expanded={true}
-                  onToggle={() => {}}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Section Save footer */}
+          {/* 5. Section Save button */}
           {fieldIds.length > 0 && (
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 disabled={saving}
                 onClick={() => void onSaveSection(fieldIds)}
@@ -1618,24 +2077,35 @@ function BtSectionCard({
   )
 }
 
-// ─── Template Section Card Component (for pure schema sections or tables) ──────
+// ─── BranchCard Component (Renders a branch container with sub-branches inside) ──
 
-interface TmplSectionCardProps {
-  sec: SchemaSection
+interface BranchCardProps {
+  branch: SectionBranch
+  expanded: boolean
+  onToggle: () => void
+  expandedCards: Set<string>
+  onToggleCard: (cardId: string) => void
+  jobId: string
   extractedMap: Map<string, ExtractedField>
   fieldValues: Record<string, string>
   activeFilter: FilterType
   searchQuery: string
   onFieldChange: (fid: string, v: string) => void
   onSave: (fid: string) => void
-  onSaveSection: (fieldIds: string[]) => Promise<void>
-  saving: boolean
-  expanded: boolean
-  onToggle: () => void
+  onSaveSection: (secId: string, fieldIds: string[]) => Promise<void>
+  onBlockUpdate?: (blockId: string, newText: string) => void
+  onBlockTableUpdate?: (blockId: string, newTableData: string[][]) => void
+  enableStaticEditing?: boolean
+  savingSections: Record<string, boolean>
 }
 
-function TmplSectionCard({
-  sec,
+function BranchCard({
+  branch,
+  expanded,
+  onToggle,
+  expandedCards,
+  onToggleCard,
+  jobId,
   extractedMap,
   fieldValues,
   activeFilter,
@@ -1643,97 +2113,219 @@ function TmplSectionCard({
   onFieldChange,
   onSave,
   onSaveSection,
-  saving,
-  expanded,
-  onToggle,
-}: TmplSectionCardProps) {
-  const { num, title } = parseSectionName(sec.section_number ? `${sec.section_number} ${sec.section_name}` : sec.section_name)
-  const [tmplRows, setTmplRows] = useState(sec.rows || [])
-  useEffect(() => {
-    setTmplRows(sec.rows || [])
-  }, [sec.rows])
+  onBlockUpdate,
+  onBlockTableUpdate,
+  enableStaticEditing,
+  savingSections,
+}: BranchCardProps) {
+  if (!branch.hasMatchingFilter) return null
 
-  const fieldIds = useMemo(() => {
-    const ids: string[] = sec.fields.map(f => f.field_id)
-    if (tmplRows) {
-      for (const r of tmplRows) {
-        for (let ci = 0; ci < (r.values ?? []).length; ci++) {
-          ids.push(`${sec.section_id}__${r.row_id}__col${ci}`)
-        }
-      }
-    }
-    return ids
-  }, [sec, tmplRows])
-
-  const defaultCount = useMemo(
-    () =>
-      fieldIds.filter(fid => {
-        const ef = extractedMap.get(fid)
-        const defVal = ef?.default_value ?? ''
-        const val = fieldValues[fid] ?? ef?.value ?? defVal
-        const orig = ef?.original_value ?? ef?.value ?? ''
-        const { isDefault } = fieldStatus(val, orig, confidencePct(ef), ef?.validation_status, defVal)
-        return isDefault
-      }).length,
-    [fieldIds, fieldValues, extractedMap]
-  )
-
-  // Check if section contains any field matching the active filter
-  const hasMatchingFilterField = useMemo(() => {
-    if (activeFilter === 'all') return true
-    for (const fid of fieldIds) {
-      const ef = extractedMap.get(fid)
-      const defVal = ef?.default_value ?? ''
-      const val = fieldValues[fid] ?? ef?.value ?? defVal
-      const orig = ef?.original_value ?? ef?.value ?? ''
-      const { isDefault, isReview, isVerified } = fieldStatus(val, orig, confidencePct(ef), ef?.validation_status, defVal)
-      if (activeFilter === 'default' && isDefault) return true
-      if (activeFilter === 'review' && isReview) return true
-      if (activeFilter === 'verified' && isVerified) return true
-    }
-    return false
-  }, [fieldIds, activeFilter, fieldValues, extractedMap])
-
-  if (!hasMatchingFilterField) return null
-
-  const matches =
+  // Check search query against branch
+  const matchesSearch =
     !searchQuery ||
-    title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    num.includes(searchQuery) ||
-    sec.fields.some(f => f.field_label.toLowerCase().includes(searchQuery.toLowerCase()))
+    branch.branchTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    branch.branchNum.includes(searchQuery) ||
+    branch.items.some(s =>
+      s.clauseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.clauseNum.includes(searchQuery) ||
+      s.fieldIds.some(fid => {
+        const ef = extractedMap.get(fid)
+        return (
+          fid.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (ef?.field_label || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (fieldValues[fid] || '').toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      })
+    )
 
-  if (!matches) return null
+  if (!matchesSearch) return null
 
-  const isTableSection = sec.field_type === 'table' || (sec.columns && sec.columns.length > 0)
+  // If this branch is NOT a container (i.e. single item that matches the branch itself, like 4.3 DISTRIBUTION TRANSFORMER)
+  if (!branch.isBranchContainer && branch.items.length === 1) {
+    const secItem = branch.items[0]
+    return (
+      <SubsectionCard
+        key={secItem.id}
+        secItem={secItem}
+        jobId={jobId}
+        extractedMap={extractedMap}
+        fieldValues={fieldValues}
+        activeFilter={activeFilter}
+        searchQuery={searchQuery}
+        onFieldChange={onFieldChange}
+        onSave={onSave}
+        onSaveSection={fids => onSaveSection(secItem.id, fids)}
+        onBlockUpdate={onBlockUpdate}
+        onBlockTableUpdate={onBlockTableUpdate}
+        enableStaticEditing={enableStaticEditing}
+        saving={savingSections[secItem.id] ?? false}
+        expanded={expandedCards.has(secItem.id)}
+        onToggle={() => onToggleCard(secItem.id)}
+      />
+    )
+  }
 
+  // Otherwise, render a Branch Card container with its sub-branches inside!
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-3">
+    <div className="rounded-xl border border-slate-300/80 bg-white shadow-xs overflow-hidden transition-all mb-2.5">
+      {/* Branch Header */}
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-slate-50/60 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-slate-50 to-blue-50/30 hover:from-slate-100 hover:to-blue-50/60 transition-colors text-left border-b border-slate-200/60"
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {num ? (
-            <span className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shadow-sm">
-              {num.split('.')[0]}
-            </span>
-          ) : (
-            <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-400 text-white text-[11px] font-bold flex items-center justify-center">
-              §
-            </span>
-          )}
-          <span className="text-sm font-bold text-slate-900 uppercase tracking-wide truncate">
-            {num ? `${num}   ${title}` : title}
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          {/* Light-blue numerical badge matching SubsectionCard */}
+          <span className="flex-shrink-0 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold font-mono tracking-tight shadow-2xs">
+            {branch.branchNum}
           </span>
-          {defaultCount > 0 && (
-            <span className="flex-shrink-0 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[10px] font-bold">
-              {defaultCount} default
-            </span>
-          )}
+
+          {/* Clean uppercase title */}
+          <span className="font-bold text-slate-900 uppercase tracking-wide text-xs md:text-sm truncate">
+            {branch.branchTitle}
+          </span>
+
         </div>
+
+        {/* Chevron icon */}
         <svg
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ml-3 ${expanded ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 text-slate-500 transition-transform duration-200 ml-3 flex-shrink-0 ${
+            expanded ? 'rotate-180' : ''
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Branch Content: Sub-branches inside! */}
+      {expanded && (
+        <div className="p-2.5 bg-slate-50/50 space-y-2 ml-1.5 border-l-2 border-blue-400/60 pl-3 my-1.5">
+          {branch.items.map(secItem => (
+            <SubsectionCard
+              key={secItem.id}
+              secItem={secItem}
+              jobId={jobId}
+              extractedMap={extractedMap}
+              fieldValues={fieldValues}
+              activeFilter={activeFilter}
+              searchQuery={searchQuery}
+              onFieldChange={onFieldChange}
+              onSave={onSave}
+              onSaveSection={fids => onSaveSection(secItem.id, fids)}
+              onBlockUpdate={onBlockUpdate}
+              onBlockTableUpdate={onBlockTableUpdate}
+              enableStaticEditing={enableStaticEditing}
+              saving={savingSections[secItem.id] ?? false}
+              expanded={expandedCards.has(secItem.id)}
+              onToggle={() => onToggleCard(secItem.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface TopLevelGroupAccordionProps {
+  grp: SectionGroup
+  expanded: boolean
+  onToggle: () => void
+  expandedBranches: Set<string>
+  onToggleBranch: (branchKey: string) => void
+  expandedCards: Set<string>
+  onToggleCard: (cardId: string) => void
+  jobId: string
+  extractedMap: Map<string, ExtractedField>
+  fieldValues: Record<string, string>
+  activeFilter: FilterType
+  searchQuery: string
+  onFieldChange: (fid: string, v: string) => void
+  onSave: (fid: string) => void
+  onSaveSection: (secId: string, fieldIds: string[]) => Promise<void>
+  onBlockUpdate?: (blockId: string, newText: string) => void
+  onBlockTableUpdate?: (blockId: string, newTableData: string[][]) => void
+  enableStaticEditing?: boolean
+  savingSections: Record<string, boolean>
+}
+
+function TopLevelGroupAccordion({
+  grp,
+  expanded,
+  onToggle,
+  expandedBranches,
+  onToggleBranch,
+  expandedCards,
+  onToggleCard,
+  jobId,
+  extractedMap,
+  fieldValues,
+  activeFilter,
+  searchQuery,
+  onFieldChange,
+  onSave,
+  onSaveSection,
+  onBlockUpdate,
+  onBlockTableUpdate,
+  enableStaticEditing,
+  savingSections,
+}: TopLevelGroupAccordionProps) {
+  if (!grp.hasMatchingFilter) return null
+
+  // Check search query against group
+  const matchesSearch =
+    !searchQuery ||
+    grp.groupTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    grp.groupNum.includes(searchQuery) ||
+    grp.sections.some(s =>
+      s.clauseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.clauseNum.includes(searchQuery) ||
+      s.fieldIds.some(fid => {
+        const ef = extractedMap.get(fid)
+        return (
+          fid.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (ef?.field_label || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (fieldValues[fid] || '').toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      })
+    )
+
+  if (!matchesSearch) return null
+
+  return (
+    <div className="rounded-2xl border border-blue-900/30 overflow-hidden shadow-sm transition-all mb-4">
+      {/* Top Header Button matching Image 3 */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-left bg-[#1351a3] hover:bg-[#104791] transition-colors"
+      >
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          {/* Index badge [ 1 ], [ 2 ], etc. */}
+          <span className="flex-shrink-0 w-7 h-7 rounded-md bg-[#0d3870] text-white text-xs font-bold flex items-center justify-center shadow-inner border border-blue-400/20">
+            {grp.groupIndex}
+          </span>
+
+          {/* Title: 1.0 SCOPE */}
+          <div className="flex items-center gap-2 truncate">
+            <span className="text-blue-200 font-semibold text-xs tracking-wider uppercase flex-shrink-0">
+              {grp.groupNum}
+            </span>
+            <span className="text-white font-bold text-sm tracking-wide uppercase truncate">
+              {grp.groupTitle}
+            </span>
+          </div>
+
+        </div>
+
+        {/* Chevron icon */}
+        <svg
+          className={`w-4 h-4 text-white/80 transition-transform duration-200 ml-3 flex-shrink-0 ${
+            expanded ? 'rotate-180' : ''
+          }`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -1743,147 +2335,31 @@ function TmplSectionCard({
         </svg>
       </button>
 
+      {/* Group Content: Render branches with sub-branches inside */}
       {expanded && (
-        <div className="border-t border-slate-100 px-5 py-4 bg-slate-50/20 space-y-3">
-          {/* Table representation if table section */}
-          {isTableSection && sec.columns && sec.columns.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm my-3">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-800 text-white text-[11px] font-bold">
-                      {sec.columns.map((col, ci) => (
-                        <th key={ci} className="px-3 py-2 text-left border-r border-slate-700 last:border-0 uppercase tracking-wider">
-                          {col}
-                        </th>
-                      ))}
-                      <th className="px-2 py-2 text-center w-12 border-l border-slate-700 uppercase tracking-wider text-slate-400 font-semibold">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tmplRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={sec.columns.length + 1} className="py-5 text-center text-xs text-slate-400 italic">
-                          No rows in this table. Click "+ Add Row" to insert a row.
-                        </td>
-                      </tr>
-                    ) : (
-                      tmplRows.map((row, ri) => (
-                        <tr key={ri} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors">
-                          {row.values.map((cell, ci) => {
-                            const cellFid = `${sec.section_id}__${row.row_id}__col${ci}`
-                            const ef = extractedMap.get(cellFid)
-                            const defVal = ef?.default_value ?? cell ?? ''
-                            const val = fieldValues[cellFid] ?? ef?.value ?? defVal
-                            const isDef = ef?.validation_status === 'default' || (Boolean(defVal) && val === defVal && (!ef || !ef.original_value))
-                            return (
-                              <td key={ci} className="p-1.5 border-r border-slate-100 last:border-0">
-                                <input
-                                  type="text"
-                                  className={`w-full px-2 py-1.5 text-xs rounded transition-all focus:outline-none focus:ring-1 ${
-                                    isDef
-                                      ? 'bg-indigo-50/50 text-indigo-900 border border-indigo-300 focus:ring-indigo-500 font-medium'
-                                      : 'bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-500'
-                                  }`}
-                                  value={val}
-                                  placeholder={sec.columns?.[ci] ? `Enter ${sec.columns[ci]}...` : ''}
-                                  onChange={e => onFieldChange(cellFid, e.target.value)}
-                                  onBlur={() => onSave(cellFid)}
-                                  title={isDef ? 'Using template default value' : undefined}
-                                />
-                              </td>
-                            )
-                          })}
-                          <td className="p-1.5 text-center w-12 border-l border-slate-100">
-                            <button
-                              type="button"
-                              onClick={() => setTmplRows(prev => prev.filter((_, idx) => idx !== ri))}
-                              title="Delete this row"
-                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 mx-auto" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="px-4 py-2 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const colCount = sec.columns?.length || 4
-                    const nextId = `row_${Date.now()}`
-                    const isCol0Serial = sec.columns?.[0]?.toLowerCase().includes('no') || sec.columns?.[0]?.toLowerCase().includes('sl')
-                    const newVals = Array(colCount).fill('')
-                    if (isCol0Serial) newVals[0] = String(tmplRows.length + 1)
-                    setTmplRows(prev => [...prev, { row_id: nextId, values: newVals }])
-                    if (isCol0Serial) {
-                      onFieldChange(`${sec.section_id}__${nextId}__col0`, String(tmplRows.length + 1))
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-white hover:bg-blue-50 rounded-lg border border-blue-200 transition-colors shadow-2xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Row</span>
-                </button>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  {tmplRows.length} {tmplRows.length === 1 ? 'row' : 'rows'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Fields list */}
-          {sec.fields.length > 0 && (
-            <div className="space-y-3">
-              {sec.fields.map(field => {
-                const ef = extractedMap.get(field.field_id)
-                const defVal = ef?.default_value ?? field.default_value ?? ''
-                const val = fieldValues[field.field_id] ?? ef?.value ?? defVal
-                const orig = ef?.original_value ?? ef?.value ?? ''
-                const { isDefault, isReview, isVerified } = fieldStatus(val, orig, confidencePct(ef), ef?.validation_status, defVal)
-
-                if (activeFilter === 'default' && !isDefault) return null
-                if (activeFilter === 'review' && !isReview) return null
-                if (activeFilter === 'verified' && !isVerified) return null
-
-                return (
-                  <FieldInput
-                    key={field.field_id}
-                    fieldId={field.field_id}
-                    label={field.field_label}
-                    value={val}
-                    origExtracted={orig}
-                    confidence={confidencePct(ef)}
-                    validationStatus={ef?.validation_status}
-                    defaultValue={defVal}
-                    sourceRef={ef?.source_references?.[0] ?? null}
-                    onChange={v => onFieldChange(field.field_id, v)}
-                    onSave={() => onSave(field.field_id)}
-                  />
-                )
-              })}
-            </div>
-          )}
-
-          {/* Section save button */}
-          {fieldIds.length > 0 && (
-            <div className="flex justify-end pt-3 border-t border-slate-100">
-              <button
-                disabled={saving}
-                onClick={() => void onSaveSection(fieldIds)}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
-              >
-                {saving ? 'Saving…' : '✓ Save Section'}
-              </button>
-            </div>
-          )}
+        <div className="p-3 bg-slate-100/70 border-t border-blue-900/20 space-y-2">
+          {grp.branches.map(branch => (
+            <BranchCard
+              key={branch.branchKey}
+              branch={branch}
+              expanded={expandedBranches.has(branch.branchKey)}
+              onToggle={() => onToggleBranch(branch.branchKey)}
+              expandedCards={expandedCards}
+              onToggleCard={onToggleCard}
+              jobId={jobId}
+              extractedMap={extractedMap}
+              fieldValues={fieldValues}
+              activeFilter={activeFilter}
+              searchQuery={searchQuery}
+              onFieldChange={onFieldChange}
+              onSave={onSave}
+              onSaveSection={onSaveSection}
+              onBlockUpdate={onBlockUpdate}
+              onBlockTableUpdate={onBlockTableUpdate}
+              enableStaticEditing={enableStaticEditing}
+              savingSections={savingSections}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -1916,10 +2392,28 @@ export default function JiraFieldEditor(props: JiraFieldEditorProps = {}) {
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
   const [savingSections, setSavingSections] = useState<Record<string, boolean>>({})
 
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set())
+  const [expandedBranches, setExpandedBranches] = useState<Set<string>>(() => new Set())
+  const [groupsInitialized, setGroupsInitialized] = useState(false)
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(() => new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
-  const [enableStaticEditing, setEnableStaticEditing] = useState(false)
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false)
+  const filterRef = React.useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterDropdownOpen(false)
+      }
+    }
+    if (filterDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [filterDropdownOpen])
 
   // ── Load Data ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1979,16 +2473,6 @@ export default function JiraFieldEditor(props: JiraFieldEditorProps = {}) {
           }
         }
         setFieldValues(initVals)
-
-        // Default expand top sections
-        const exp = new Set<string>()
-        if (fetchedJob.populated_tree?.sections?.length) {
-          fetchedJob.populated_tree.sections.forEach(s => exp.add(s.section_id))
-        }
-        if (tmpl?.sections?.length) {
-          tmpl.sections.forEach((s, idx) => exp.add(s.section_id || `sec-${idx}`))
-        }
-        setExpandedSections(exp)
       })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
@@ -2032,7 +2516,10 @@ export default function JiraFieldEditor(props: JiraFieldEditorProps = {}) {
     const m = new Map<string, SchemaSection>()
     for (const ts of tmplBodySections) {
       if (ts.section_number) {
-        m.set(ts.section_number.trim(), ts)
+        const sNum = ts.section_number.trim()
+        m.set(sNum, ts)
+        const sNumMatch = sNum.match(/^(\d+(?:\.\d+)*)/)
+        if (sNumMatch) m.set(sNumMatch[0], ts)
       }
       m.set(ts.section_name.trim().toLowerCase(), ts)
     }
@@ -2044,8 +2531,9 @@ export default function JiraFieldEditor(props: JiraFieldEditorProps = {}) {
     const matched = new Set<string>()
     for (const bSec of btBodySections) {
       const sNum = (bSec.section_number || '').trim()
+      const sNumClean = sNum.match(/^(\d+(?:\.\d+)*)/)?.[0] || sNum
       const sTitle = (bSec.heading_text || '').trim().toLowerCase()
-      const matchedTs = tmplSectionMap.get(sNum) || tmplSectionMap.get(sTitle)
+      const matchedTs = tmplSectionMap.get(sNum) || tmplSectionMap.get(sNumClean) || tmplSectionMap.get(sTitle)
       if (matchedTs?.section_id) {
         matched.add(matchedTs.section_id)
       }
@@ -2119,6 +2607,269 @@ export default function JiraFieldEditor(props: JiraFieldEditorProps = {}) {
 
     return { total, defaultCount, review, verified }
   }, [job, template, fieldValues, extractedMap, tmplFieldMap])
+
+  // ── Unified Grouping Logic (TOC-aligned, 0 missed numbers) ────────────────
+  const unifiedSectionGroups = useMemo<SectionGroup[]>(() => {
+    // 1. Determine canonical TOC list for template
+    const tocList: { key: string; num: string; title: string }[] = []
+    if (template?.content_page && template.content_page.length > 0) {
+      template.content_page.forEach((cp, idx) => {
+        const key = cp.number.split('.')[0] || String(idx + 1)
+        tocList.push({ key, num: cp.number, title: cp.title.toUpperCase() })
+      })
+    } else {
+      // Fallback to canonical TOC groups
+      Object.entries(CANONICAL_SPEC01_TOC).forEach(([k, v]) => {
+        tocList.push({ key: k, num: v.num, title: v.title })
+      })
+    }
+
+    const groupMap = new Map<string, GroupSectionItem[]>()
+    tocList.forEach(t => groupMap.set(t.key, []))
+
+    // 2. Flatten populated_tree body sections recursively
+    function flattenTree(sections: BtSection[]): BtSection[] {
+      const result: BtSection[] = []
+      function traverse(s: BtSection) {
+        if (s.heading_text === '__preamble__' || s.section_id === 'sec_preamble') return
+        // Include if it has blocks, or if it is a leaf section (no subsections)
+        if (s.blocks.length > 0 || s.subsections.length === 0) {
+          result.push(s)
+        }
+        s.subsections.forEach(traverse)
+      }
+      sections.forEach(traverse)
+      return result
+    }
+
+    const flatBtSections = flattenTree(job?.populated_tree?.sections ?? [])
+
+    // Process document sections
+    for (const bSec of flatBtSections) {
+      const res = resolveClause(bSec.section_number, bSec.heading_text, template?.content_page)
+      const gKey = res.groupKey
+      if (!groupMap.has(gKey)) {
+        groupMap.set(gKey, [])
+      }
+
+      // Collect all field IDs
+      const fids: string[] = []
+      for (const b of bSec.blocks) {
+        if (b.field_binding?.field_id) fids.push(b.field_binding.field_id)
+        if (b.row_bindings) {
+          for (const rb of Object.values(b.row_bindings)) {
+            if (rb.field_id) fids.push(rb.field_id)
+          }
+        }
+        if (b.cell_bindings) {
+          for (const cb of Object.values(b.cell_bindings)) {
+            if (cb.field_id) fids.push(cb.field_id)
+          }
+        }
+      }
+
+      // Match with template section if available
+      const sNum = (bSec.section_number || '').trim()
+      const sNumClean = sNum.match(/^(\d+(?:\.\d+)*)/)?.[0] || sNum
+      const sTitle = (bSec.heading_text || '').trim().toLowerCase()
+      const matchedTs = tmplSectionMap.get(sNum) || tmplSectionMap.get(sNumClean) || tmplSectionMap.get(sTitle) || null
+      if (matchedTs?.fields) {
+        for (const f of matchedTs.fields) fids.push(f.field_id)
+      }
+      if (matchedTs?.rows) {
+        for (const r of matchedTs.rows) {
+          for (let ci = 0; ci < (r.values ?? []).length; ci++) {
+            fids.push(`${matchedTs.section_id}__${r.row_id}__col${ci}`)
+          }
+        }
+      }
+
+      const uniqueFids = Array.from(new Set(fids))
+      const defCount = uniqueFids.filter(fid => {
+        const ef = extractedMap.get(fid)
+        const defVal = ef?.default_value ?? ''
+        const val = fieldValues[fid] ?? ef?.value ?? defVal
+        const orig = ef?.original_value ?? ef?.value ?? ''
+        return fieldStatus(val, orig, confidencePct(ef), ef?.validation_status, defVal).isDefault
+      }).length
+
+      const existingList = groupMap.get(gKey)!
+      const existingIdx = existingList.findIndex(it => it.clauseNum === res.clauseNum)
+      if (existingIdx >= 0) {
+        // If current has blocks and previous didn't, replace with current
+        if (bSec.blocks.length > 0 && (!existingList[existingIdx].btSec || existingList[existingIdx].btSec!.blocks.length === 0)) {
+          existingList[existingIdx] = {
+            id: bSec.section_id,
+            clauseNum: res.clauseNum,
+            clauseTitle: res.clauseTitle,
+            source: 'doc',
+            btSec: bSec,
+            matchedTemplateSec: matchedTs,
+            fieldIds: uniqueFids,
+            defaultCount: defCount,
+          }
+        }
+      } else {
+        existingList.push({
+          id: bSec.section_id,
+          clauseNum: res.clauseNum,
+          clauseTitle: res.clauseTitle,
+          source: 'doc',
+          btSec: bSec,
+          matchedTemplateSec: matchedTs,
+          fieldIds: uniqueFids,
+          defaultCount: defCount,
+        })
+      }
+    }
+
+    // Process unmapped template schema sections
+    for (const tSec of unmappedTmplSections) {
+      const res = resolveClause(tSec.section_number, tSec.section_name, template?.content_page)
+      const gKey = res.groupKey
+      if (!groupMap.has(gKey)) {
+        groupMap.set(gKey, [])
+      }
+
+      const fids: string[] = tSec.fields.map(f => f.field_id)
+      if (tSec.rows) {
+        for (const r of tSec.rows) {
+          for (let ci = 0; ci < (r.values ?? []).length; ci++) {
+            fids.push(`${tSec.section_id}__${r.row_id}__col${ci}`)
+          }
+        }
+      }
+
+      const uniqueFids = Array.from(new Set(fids))
+      const defCount = uniqueFids.filter(fid => {
+        const ef = extractedMap.get(fid)
+        const defVal = ef?.default_value ?? ''
+        const val = fieldValues[fid] ?? ef?.value ?? defVal
+        const orig = ef?.original_value ?? ef?.value ?? ''
+        return fieldStatus(val, orig, confidencePct(ef), ef?.validation_status, defVal).isDefault
+      }).length
+
+      const existingList = groupMap.get(gKey)!
+      const existingIdx = existingList.findIndex(it => it.clauseNum === res.clauseNum)
+      if (existingIdx < 0) {
+        existingList.push({
+          id: tSec.section_id,
+          clauseNum: res.clauseNum,
+          clauseTitle: res.clauseTitle,
+          source: 'tmpl',
+          tmplSec: tSec,
+          fieldIds: uniqueFids,
+          defaultCount: defCount,
+        })
+      }
+    }
+
+    // Assemble final SectionGroup array with nested branch grouping
+    const result: SectionGroup[] = []
+    let groupIdx = 1
+
+    for (const tocItem of tocList) {
+      const rawItems = groupMap.get(tocItem.key) || []
+      // Sort items by natural clause numbering
+      rawItems.sort((a, b) => compareClauses(a.clauseNum, b.clauseNum))
+
+      // Group items by branch key (e.g. 4.5, 4.2, 4.6, 2.3, etc.)
+      const branchMap = new Map<string, GroupSectionItem[]>()
+      for (const it of rawItems) {
+        const bKey = getBranchKey(it.clauseNum)
+        if (!branchMap.has(bKey)) {
+          branchMap.set(bKey, [])
+        }
+        branchMap.get(bKey)!.push(it)
+      }
+
+      const branches: SectionBranch[] = []
+      const visibleAllItems: GroupSectionItem[] = []
+
+      for (const [bKey, rawBranchItems] of branchMap.entries()) {
+        // Filter out empty placeholder headings if sub-branches exist
+        const bItems = rawBranchItems.filter(it => {
+          if (it.clauseNum === bKey && rawBranchItems.length > 1) {
+            const hasBlocks = (it.btSec?.blocks?.length ?? 0) > 0
+            const hasFields = it.fieldIds.length > 0
+            return hasBlocks || hasFields
+          }
+          return true
+        })
+
+        if (bItems.length === 0) continue
+
+        visibleAllItems.push(...bItems)
+
+        const branchTitle =
+          CANONICAL_BRANCH_TITLES[bKey] ||
+          bItems.find(x => x.clauseNum === bKey)?.clauseTitle ||
+          bItems[0]?.clauseTitle ||
+          bKey
+
+        const isBranchContainer = bItems.length > 1
+        const bTotal = bItems.length
+        const bDefaults = bItems.reduce((acc, it) => acc + it.defaultCount, 0)
+
+        const bHasMatchingFilter =
+          activeFilter === 'all' ||
+          bItems.some(it => {
+            return it.fieldIds.some(fid => {
+              const ef = extractedMap.get(fid)
+              const defVal = ef?.default_value ?? ''
+              const val = fieldValues[fid] ?? ef?.value ?? defVal
+              const orig = ef?.original_value ?? ef?.value ?? ''
+              const { isDefault, isReview, isVerified } = fieldStatus(val, orig, confidencePct(ef), ef?.validation_status, defVal)
+              if (activeFilter === 'default' && isDefault) return true
+              if (activeFilter === 'review' && isReview) return true
+              if (activeFilter === 'verified' && isVerified) return true
+              return false
+            })
+          })
+
+        branches.push({
+          branchKey: bKey,
+          branchNum: bKey,
+          branchTitle,
+          items: bItems,
+          isBranchContainer,
+          totalSections: bTotal,
+          defaultCount: bDefaults,
+          hasMatchingFilter: bHasMatchingFilter,
+        })
+      }
+
+      const totalSections = visibleAllItems.length
+      const totalDefaults = visibleAllItems.reduce((acc, it) => acc + it.defaultCount, 0)
+      const hasMatchingFilter = branches.some(b => b.hasMatchingFilter)
+
+      result.push({
+        groupKey: tocItem.key,
+        groupIndex: groupIdx++,
+        groupNum: tocItem.num,
+        groupTitle: tocItem.title,
+        branches,
+        sections: visibleAllItems,
+        totalSections,
+        defaultCount: totalDefaults,
+        hasMatchingFilter,
+      })
+    }
+
+    return result
+  }, [template, job, unmappedTmplSections, tmplSectionMap, fieldValues, extractedMap, activeFilter])
+
+  // Default when open: All main groups open so 1.0 and main sub-branches are visible, but branch containers and cards collapsed
+  useEffect(() => {
+    if (unifiedSectionGroups.length > 0 && !groupsInitialized) {
+      const allG = new Set<string>()
+      unifiedSectionGroups.forEach(grp => allG.add(grp.groupKey))
+      setExpandedGroups(allG)
+      setExpandedBranches(new Set())
+      setExpandedCards(new Set())
+      setGroupsInitialized(true)
+    }
+  }, [unifiedSectionGroups, groupsInitialized])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleFieldChange = (fid: string, v: string) => {
@@ -2207,23 +2958,55 @@ export default function JiraFieldEditor(props: JiraFieldEditorProps = {}) {
     }
   }, [jobId])
 
-  const toggleSection = (id: string) => {
-    setExpandedSections(prev => {
+  const toggleGroup = (gKey: string) => {
+    setExpandedGroups(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(gKey)) next.delete(gKey)
+      else next.add(gKey)
+      return next
+    })
+  }
+
+  const toggleCard = (cardId: string) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev)
+      if (next.has(cardId)) next.delete(cardId)
+      else next.add(cardId)
+      return next
+    })
+  }
+
+  const toggleBranch = (branchKey: string) => {
+    setExpandedBranches(prev => {
+      const next = new Set(prev)
+      if (next.has(branchKey)) next.delete(branchKey)
+      else next.add(branchKey)
       return next
     })
   }
 
   const expandAll = () => {
-    const next = new Set<string>()
-    btBodySections.forEach(s => next.add(s.section_id))
-    tmplBodySections.forEach((s, idx) => next.add(s.section_id || `sec-${idx}`))
-    setExpandedSections(next)
+    const allG = new Set<string>()
+    const allB = new Set<string>()
+    const allC = new Set<string>()
+    unifiedSectionGroups.forEach(grp => {
+      allG.add(grp.groupKey)
+      grp.branches.forEach(b => allB.add(b.branchKey))
+      grp.sections.forEach(s => allC.add(s.id))
+    })
+    setExpandedGroups(allG)
+    setExpandedBranches(allB)
+    setExpandedCards(allC)
   }
 
-  const collapseAll = () => setExpandedSections(new Set())
+  const collapseAll = () => {
+    // Keep main groups open so 1.0 and all main sub-branches are visible, collapse branch containers and cards
+    const allG = new Set<string>()
+    unifiedSectionGroups.forEach(grp => allG.add(grp.groupKey))
+    setExpandedGroups(allG)
+    setExpandedBranches(new Set())
+    setExpandedCards(new Set())
+  }
 
   // ── Loading & Error states ────────────────────────────────────────────────
   if (loading) {
@@ -2359,101 +3142,153 @@ export default function JiraFieldEditor(props: JiraFieldEditorProps = {}) {
               Collapse All
             </button>
 
-            {/* Optional Static Field Editing Toggle */}
-            <button
-              type="button"
-              onClick={() => setEnableStaticEditing(p => !p)}
-              className={`px-3 py-2 text-xs font-semibold border rounded-xl transition-all flex items-center gap-1.5 ${
-                enableStaticEditing
-                  ? 'bg-blue-50 text-blue-700 border-blue-300 ring-2 ring-blue-500/20 shadow-2xs'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-              }`}
-              title="Toggle optional static text editing mode across all document sections"
-            >
-              <Pencil className="w-3.5 h-3.5 text-blue-600" />
-              <span>Edit Static Fields</span>
-              {enableStaticEditing && (
-                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-              )}
-            </button>
-
-            {/* Filter Buttons */}
-            {(
-              [
-                ['all', `All (${stats.total})`, 'bg-blue-600 text-white border-blue-600'],
-                ['default', `📋 Default (${stats.defaultCount})`, 'bg-indigo-600 text-white border-indigo-600'],
-                ['review', `⚠️ Review (${stats.review})`, 'bg-amber-500 text-white border-amber-500'],
-                ['verified', `✓ Verified (${stats.verified})`, 'bg-emerald-600 text-white border-emerald-600'],
-              ] as const
-            ).map(([f, label, activeClass]) => (
+            {/* Filter Dropdown (Reference Image) */}
+            <div className="relative" ref={filterRef}>
               <button
-                key={f}
-                onClick={() => setActiveFilter(f)}
-                className={`px-3 py-2 text-xs font-semibold border rounded-xl transition-colors ${
-                  activeFilter === f ? activeClass : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                type="button"
+                onClick={() => setFilterDropdownOpen(p => !p)}
+                className={`px-3.5 py-2 text-xs font-semibold rounded-xl border transition-all flex items-center gap-2 ${
+                  filterDropdownOpen || activeFilter !== 'all'
+                    ? 'bg-blue-50 text-blue-700 border-blue-300 ring-2 ring-blue-500/20 shadow-2xs'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                {label}
+                <Filter className="w-3.5 h-3.5 text-slate-500" />
+                <span>Filter</span>
+                {filterDropdownOpen ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                )}
               </button>
-            ))}
+
+              {/* Filter Options Popover */}
+              {filterDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 pt-2 pb-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    FILTER OPTIONS
+                  </div>
+                  <div className="space-y-1 mt-1">
+                    {/* All Parameters */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveFilter('all')
+                        setFilterDropdownOpen(false)
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                        activeFilter === 'all'
+                          ? 'bg-blue-50/70 text-blue-700 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <FileText className="w-4 h-4 text-blue-500" />
+                        <span>All Parameters</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">{stats.total}</span>
+                    </button>
+
+                    {/* Default */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveFilter('default')
+                        setFilterDropdownOpen(false)
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                        activeFilter === 'default'
+                          ? 'bg-indigo-50/70 text-indigo-700 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <ClipboardList className="w-4 h-4 text-indigo-600" />
+                        <span>Default</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {stats.defaultCount}
+                      </span>
+                    </button>
+
+                    {/* Review */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveFilter('review')
+                        setFilterDropdownOpen(false)
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                        activeFilter === 'review'
+                          ? 'bg-amber-50/70 text-amber-700 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        <span>Review</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                        {stats.review}
+                      </span>
+                    </button>
+
+                    {/* Verified */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveFilter('verified')
+                        setFilterDropdownOpen(false)
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                        activeFilter === 'verified'
+                          ? 'bg-emerald-50/70 text-emerald-700 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Verified</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                        {stats.verified}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── 3. Hybrid Section List ── */}
-        <div className="space-y-3">
-          {/* Document block-tree sections */}
-          {btBodySections.map(sec => {
-            // Try to find matching template schema section by section number or heading text
-            const sNum = (sec.section_number || '').trim()
-            const sTitle = (sec.heading_text || '').trim().toLowerCase()
-            const matchedTemplateSec = tmplSectionMap.get(sNum) || tmplSectionMap.get(sTitle) || null
+        {/* ── 3. Grouped Section Accordions (Reference Images 3 & 4) ── */}
+        <div className="space-y-4">
+          {unifiedSectionGroups.map(grp => (
+            <TopLevelGroupAccordion
+              key={grp.groupKey}
+              grp={grp}
+              expanded={expandedGroups.has(grp.groupKey)}
+              onToggle={() => toggleGroup(grp.groupKey)}
+              expandedBranches={expandedBranches}
+              onToggleBranch={toggleBranch}
+              expandedCards={expandedCards}
+              onToggleCard={toggleCard}
+              jobId={jobId!}
+              extractedMap={extractedMap}
+              fieldValues={fieldValues}
+              activeFilter={activeFilter}
+              searchQuery={searchQuery}
+              onFieldChange={handleFieldChange}
+              onSave={handleSaveField}
+              onSaveSection={handleSaveSection}
+              onBlockUpdate={handleBlockUpdate}
+              onBlockTableUpdate={handleBlockTableUpdate}
+              enableStaticEditing={true}
+              savingSections={savingSections}
+            />
+          ))}
 
-            return (
-              <BtSectionCard
-                key={sec.section_id}
-                sec={sec}
-                level={0}
-                jobId={jobId!}
-                extractedMap={extractedMap}
-                fieldValues={fieldValues}
-                activeFilter={activeFilter}
-                searchQuery={searchQuery}
-                onFieldChange={handleFieldChange}
-                onSave={handleSaveField}
-                onSaveSection={fieldIds => handleSaveSection(sec.section_id, fieldIds)}
-                onBlockUpdate={handleBlockUpdate}
-                onBlockTableUpdate={handleBlockTableUpdate}
-                enableStaticEditing={enableStaticEditing}
-                saving={savingSections[sec.section_id] ?? false}
-                expanded={expandedSections.has(sec.section_id)}
-                onToggle={() => toggleSection(sec.section_id)}
-                matchedTemplateSec={matchedTemplateSec}
-              />
-            )
-          })}
-
-          {/* Template sections not present in source document (tables, standard specs with defaults) */}
-          {unmappedTmplSections.map((sec, idx) => {
-            const secId = sec.section_id || `sec-${idx}`
-            return (
-              <TmplSectionCard
-                key={secId}
-                sec={sec}
-                extractedMap={extractedMap}
-                fieldValues={fieldValues}
-                activeFilter={activeFilter}
-                searchQuery={searchQuery}
-                onFieldChange={handleFieldChange}
-                onSave={handleSaveField}
-                onSaveSection={fieldIds => handleSaveSection(secId, fieldIds)}
-                saving={savingSections[secId] ?? false}
-                expanded={expandedSections.has(secId)}
-                onToggle={() => toggleSection(secId)}
-              />
-            )
-          })}
-
-          {btBodySections.length === 0 && unmappedTmplSections.length === 0 && (
+          {unifiedSectionGroups.length === 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 text-sm shadow-sm">
               No sections found in document. Please run extraction.
             </div>

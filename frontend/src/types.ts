@@ -11,7 +11,10 @@ export interface TemplateField {
 export interface TemplateSection {
   section_id: string
   section_name: string
+  section_number?: string | null
   fields: TemplateField[]
+  columns?: string[]
+  rows?: any[]
 }
 
 export interface DocumentSection {
@@ -22,6 +25,11 @@ export interface DocumentSection {
   paragraphs: unknown[]
 }
 
+export interface ContentPageItem {
+  number: string
+  title: string
+}
+
 export interface TemplateListResponse {
   template_id: string
   template_name: string
@@ -30,6 +38,7 @@ export interface TemplateListResponse {
   description?: string | null
   structure_locked?: boolean
   sections?: TemplateSection[]
+  content_page?: ContentPageItem[]
   page_count?: number
   preview_html?: string | null
   document_sections?: DocumentSection[]

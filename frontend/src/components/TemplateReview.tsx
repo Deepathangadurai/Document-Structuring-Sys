@@ -9,7 +9,7 @@ import {
   updatePendingTemplate,
 } from '../services/api'
 import type { PendingTemplateResponse, TemplateField, TemplateSection, StaticBlock } from '../types'
-import StaticContentForm from './StaticContentForm'
+import StaticContentForm from './staticcontentform'
 
 // ---------------------------------------------------------------------------
 // Jira-style inline editable text

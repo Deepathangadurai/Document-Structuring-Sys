@@ -425,6 +425,7 @@ class TemplateService:
             "specification_number": cast(str | None, getattr(template, "specification_number")),
             "version": cast(str, getattr(template, "version")),
             "description": cast(str | None, getattr(template, "description")),
+            "content_page": schema_data.get("content_page", []),
             "sections": schema_data.get("sections", []),
             "page_count": int(schema_data.get("page_count") or 1),
             "preview_html": schema_data.get("preview_html") or "",

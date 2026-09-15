@@ -17,7 +17,10 @@ class TemplateField(BaseModel):
 class TemplateSection(BaseModel):
     section_id: str
     section_name: str
+    section_number: Optional[str] = None
     page_number: Optional[int] = None
+    columns: Optional[List[str]] = None
+    rows: Optional[List[Any]] = None
     fields: List[TemplateField] = Field(default_factory=list)
 
     class Config:
@@ -58,6 +61,7 @@ class TemplateListResponse(BaseModel):
     specification_number: Optional[str] = None
     description: Optional[str] = None
     structure_locked: bool = False
+    content_page: Optional[List[dict[str, str]]] = Field(default_factory=list)
     sections: List[TemplateSection] = Field(default_factory=list)
     page_count: int = 1
     preview_html: Optional[str] = None

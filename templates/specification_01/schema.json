@@ -6,6 +6,44 @@
   "description": "Master template definition for Specification 01 - Electrical Design Basis, Pashmina Project, Momentive Performance Materials, Chennai. Restructured to mirror the document's actual clause hierarchy (Sections 2-8) and to capture every project-specific (red-highlighted) dynamic field/value in the source .docx, instead of only the cover-page fields.",
   "file_name": "IP009-43-00-01-0.docx",
   "structure_locked": true,
+  "content_page": [
+    {
+      "number": "1.0",
+      "title": "SCOPE"
+    },
+    {
+      "number": "2.0",
+      "title": "GENERAL & DESIGN CONDITIONS"
+    },
+    {
+      "number": "3.0",
+      "title": "POWER DISTRIBUTION PHILOSOPHY"
+    },
+    {
+      "number": "4.0",
+      "title": "SPECIFICATION OF ELECTRICAL EQUIPMENTS"
+    },
+    {
+      "number": "5.0",
+      "title": "LIGHTING SYSTEM"
+    },
+    {
+      "number": "6.0",
+      "title": "HEAT TRACING SYSTEM"
+    },
+    {
+      "number": "7.0",
+      "title": "FIRE ALARM SYSTEM"
+    },
+    {
+      "number": "8.0",
+      "title": "PLANT COMMUNICATION SYSTEM"
+    },
+    {
+      "number": "9.0",
+      "title": "STATUTORY APPROVAL"
+    }
+  ],
   "field_marking_convention": "In the source Word document, every project-specific / fill-in value is marked with RED HIGHLIGHT (character shading), distinguishing it from the fixed boilerplate specification text. Each 'field' below corresponds 1:1 to one red-highlighted run of text, referenced by its clause number. Repeating tables (cable sizing, voltage drops, illumination levels) are modeled as field_type: 'table' with explicit rows since their red-highlighted content is tabular, not a single label:value pair. Table sections are row-editable (rows_editable: true): rows can be added or deleted to match whatever rows actually exist in a given revision of the document -- the 'rows' array is a seed/current snapshot, not a fixed count.",
   "sections": [
     {
@@ -2261,9 +2299,9 @@
       ]
     },
     {
-      "section_id": "pmcc_mcc_misc",
-      "section_number": "4.5.5-4.5.11",
-      "section_name": "PMCC / MCC - Cable Entry, Isolators, Starters, Relays, Metering, DCS",
+      "section_id": "pmcc_mcc_cable_entry",
+      "section_number": "4.5.5",
+      "section_name": "PMCC / MCC - Cable Entry",
       "fields": [
         {
           "field_id": "pmcc_cable_entry",
@@ -2278,7 +2316,14 @@
             "Cable entry",
             "Cable Entry"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "pmcc_mcc_isolator",
+      "section_number": "4.5.6",
+      "section_name": "PMCC / MCC - Isolator Type (MCCB / SFU / ACB)",
+      "fields": [
         {
           "field_id": "isolator_type_upto_630a",
           "field_label": "Isolator type - Upto 630A",
@@ -2307,7 +2352,14 @@
             "Isolator Type - 800A And Above",
             "Isolator type - 800A & above"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "pmcc_mcc_starters",
+      "section_number": "4.5.7",
+      "section_name": "PMCC / MCC - Type of Motor Starters",
+      "fields": [
         {
           "field_id": "motor_starter_dol",
           "field_label": "Type of Motor starters - DOL starting",
@@ -2335,7 +2387,14 @@
             "Type of Motor starters - Star delta starting",
             "Type Of Motor Starters - Star Delta Starting"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "pmcc_mcc_relays",
+      "section_number": "4.5.8",
+      "section_name": "PMCC / MCC - Protective Relays",
+      "fields": [
         {
           "field_id": "protective_relay_incoming",
           "field_label": "Protective Relays - Incoming Feeders",
@@ -2375,7 +2434,14 @@
             "Protective Relays - Feeder to MCC, MLDB, Capacitor panel",
             "Protective Relays - Feeder To Mcc, Mldb, Capacitor Panel"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "pmcc_mcc_metering",
+      "section_number": "4.5.9",
+      "section_name": "PMCC / MCC - Metering",
+      "fields": [
         {
           "field_id": "metering_incoming_outgoing",
           "field_label": "Metering - Incoming Feeder & outgoing feeders",
@@ -2390,7 +2456,14 @@
             "Metering - Incoming Feeder & Outgoing Feeders",
             "Metering - Incoming Feeder and outgoing feeders"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "pmcc_mcc_alarm_dcs",
+      "section_number": "4.5.10",
+      "section_name": "PMCC / MCC - Provision of Alarm / Tripping at DCS",
+      "fields": [
         {
           "field_id": "alarm_tripping_provision_dcs",
           "field_label": "Provision of Alarm / Tripping at DCS",
@@ -2404,7 +2477,14 @@
             "Provision of Alarm / Tripping at DCS",
             "Provision Of Alarm / Tripping At Dcs"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "pmcc_mcc_dcs_interface",
+      "section_number": "4.5.11",
+      "section_name": "PMCC / MCC - Interfacing to DCS",
+      "fields": [
         {
           "field_id": "interfacing_to_dcs",
           "field_label": "Interfacing to DCS",
@@ -2605,8 +2685,8 @@
     },
     {
       "section_id": "mldb_pdb_feeders",
-      "section_number": "4.6.3-4.6.4",
-      "section_name": "Main Lighting/Power Distribution Board - Feeders & Location",
+      "section_number": "4.6.3",
+      "section_name": "Main Lighting/Power Distribution Board - Feeders",
       "fields": [
         {
           "field_id": "mldb_feeder_component_type",
@@ -2651,7 +2731,14 @@
             "Incoming/Outgoing Feeders - Metering (Volt, Current)",
             "Incoming/Outgoing Feeders - Metering"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "mldb_pdb_location",
+      "section_number": "4.6.4",
+      "section_name": "Main Lighting/Power Distribution Board - Location",
+      "fields": [
         {
           "field_id": "mldb_location",
           "field_label": "Location",
@@ -4250,9 +4337,9 @@
       ]
     },
     {
-      "section_id": "sub_lighting_db_busbar_feeders",
-      "section_number": "5.3.2-5.3.4",
-      "section_name": "Sub Lighting Distribution Board - Busbar & Feeders",
+      "section_id": "sub_lighting_db_busbar",
+      "section_number": "5.3.2",
+      "section_name": "Sub Lighting Distribution Board - Busbar",
       "fields": [
         {
           "field_id": "sldb_busbar_material",
@@ -4282,7 +4369,14 @@
             "Busbar - Fault Level",
             "Busbar - Fault Lvl"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "sub_lighting_db_incoming",
+      "section_number": "5.3.3",
+      "section_name": "Sub Lighting Distribution Board - Incoming Feeder",
+      "fields": [
         {
           "field_id": "sldb_incoming_feeder_type",
           "field_label": "Incoming Feeder - Type (TPN /DP/SP)",
@@ -4311,7 +4405,14 @@
             "Incoming Feeder - Type of Component",
             "Incoming Feeder - Type Of Component"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "sub_lighting_db_outgoing",
+      "section_number": "5.3.4",
+      "section_name": "Sub Lighting Distribution Board - Outgoing Feeder",
+      "fields": [
         {
           "field_id": "sldb_outgoing_feeder_type",
           "field_label": "Outgoing Feeder - Type (SPN /DP)",
@@ -4424,9 +4525,9 @@
       ]
     },
     {
-      "section_id": "fire_alarm_system_details",
-      "section_number": "7.2-7.5",
-      "section_name": "Fire Alarm System - Details",
+      "section_id": "fire_alarm_detector",
+      "section_number": "7.2",
+      "section_name": "Fire Alarm System - Detector Type",
       "fields": [
         {
           "field_id": "fire_alarm_detector_type",
@@ -4441,7 +4542,14 @@
             "Detector type",
             "Detector Type"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "fire_alarm_power",
+      "section_number": "7.3",
+      "section_name": "Fire Alarm System - Power Supply",
+      "fields": [
         {
           "field_id": "fire_alarm_power_supply",
           "field_label": "Power supply",
@@ -4455,7 +4563,14 @@
             "Power supply",
             "Power Supply"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "fire_alarm_hooter",
+      "section_number": "7.4",
+      "section_name": "Fire Alarm System - Hooter Type & Range",
+      "fields": [
         {
           "field_id": "fire_alarm_hooter_type",
           "field_label": "Hooter type & range",
@@ -4470,7 +4585,14 @@
             "Hooter Type & Range",
             "Hooter type and range"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "section_id": "fire_alarm_zones",
+      "section_number": "7.5",
+      "section_name": "Fire Alarm System - No. of Zones",
+      "fields": [
         {
           "field_id": "fire_alarm_num_zones",
           "field_label": "No. of Zones",
